@@ -21,7 +21,7 @@ import { NotificationModule } from './notification/notification.module';
       password: process.env.DB_PASS || 'postgres',
       database: process.env.DB_NAME || 'proje',
       autoLoadEntities: true,
-      synchronize: true, // Prod ortamda false yap!
+      synchronize: true,
     }),
     UserModule,
     AuthModule,
@@ -29,7 +29,7 @@ import { NotificationModule } from './notification/notification.module';
     CommentModule,
     NotificationModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [],
+  providers: [],
 })
 export class AppModule {}

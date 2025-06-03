@@ -21,7 +21,10 @@ export class NotificationService {
     });
   }
 
-  async markAsRead(notificationId: number, user: User): Promise<Notification | null> {
+  async markAsRead(
+    notificationId: number,
+    user: User,
+  ): Promise<Notification | null> {
     const notif = await this.notificationRepo.findOne({
       where: { id: notificationId, user: { id: user.id } },
     });
@@ -31,7 +34,11 @@ export class NotificationService {
   }
 
   // Interceptor veya başka bir servis çağırabilir!
-  async createNotification(params: { user: User; task: Task; message: string }) {
+  async createNotification(params: {
+    user: User;
+    task: Task;
+    message: string;
+  }) {
     const notif = this.notificationRepo.create({
       user: params.user,
       task: params.task,
