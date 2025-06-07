@@ -21,10 +21,6 @@ export class UserService {
     return this.userRepo.save(user);
   }
 
-  async findAll(): Promise<User[]> {
-    return this.userRepo.find();
-  }
-
   async findById(id: number): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('Kullanıcı bulunamadı');
@@ -33,5 +29,9 @@ export class UserService {
 
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepo.findOne({ where: { email } });
+  }
+
+  async findByUsername(username: string): Promise<User | null> {
+    return this.userRepo.findOne({ where: { username } });
   }
 }

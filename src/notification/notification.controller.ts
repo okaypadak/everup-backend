@@ -1,11 +1,9 @@
-import { Controller, Get, Req, UseGuards, Patch, Param, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Req, Patch, Param, UseInterceptors } from '@nestjs/common';
 import { NotificationService } from './notification.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ResponseNotificationDto } from './dto/response-notification.dto';
 import { ClassSerializerInterceptor } from '@nestjs/common';
 
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
 @UseInterceptors(ClassSerializerInterceptor)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}

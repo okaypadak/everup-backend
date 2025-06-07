@@ -1,40 +1,43 @@
-import { Controller, Post, Body, Get, Param, Patch, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  ParseIntPipe,
+  Req,
+  UseGuards
+} from '@nestjs/common';
 import { TaskService } from './task.service';
 import { CreateTaskDto } from './dto/create-task.dto';
-import { UpdateTaskDto } from './dto/update-task.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Task } from './task.entity';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { ResponseTaskDto } from './dto/response-task.dto';
-import { ClassSerializerInterceptor } from '@nestjs/common';
 
 @Controller('tasks')
-@UseGuards(JwtAuthGuard)
-@UseInterceptors(ClassSerializerInterceptor)
+@UseGuards(RolesGuard)
 export class TaskController {
   constructor(private readonly taskService: TaskService) {}
 
   @Post()
-  async create(@Body() dto: CreateTaskDto): Promise<ResponseTaskDto> {
-    return this.taskService.create(dto);
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async create(@Req() req: any, @Body() createTaskDto: CreateTaskDto) {
+    await this.taskService.create(createTaskDto, req.user);
+    return { success: true, message: 'İşlem başarılı' };
   }
 
-  @Get()
-  async findAll(): Promise<ResponseTaskDto[]> {
-    return this.taskService.findAll();
+  @Get(':projectId')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async findAllByProject(
+    @Param('projectId') projectId: number,
+    @Req() req: any
+  ): Promise<ResponseTaskDto> {
+    return this.taskService.findAllByUserOrRoleAndProject(req.user, Number(projectId));
   }
 
   @Get(':id')
-  async findById(@Param('id') id: number): Promise<ResponseTaskDto> {
-    return this.taskService.findById(Number(id));
-  }
-
-  @Patch(':id')
-  async update(@Param('id') id: number, @Body() dto: UpdateTaskDto): Promise<ResponseTaskDto> {
-    return this.taskService.update(Number(id), dto);
-  }
-
-  @Get('assigned/me')
-  async myTasks(@Req() req): Promise<ResponseTaskDto[]> {
-    const userId = req.user.id;
-    return this.taskService.findByAssignedUser(userId);
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Task> {
+    return this.taskService.findOne(id);
   }
 }

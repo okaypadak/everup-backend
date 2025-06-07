@@ -1,15 +1,29 @@
-import { Controller, Post, Body, UseInterceptors, ClassSerializerInterceptor } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { UserService } from '../user/user.service';
+import { CreateUserDto } from '../user/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
-import { LoginResponseDto } from './dto/login-response.dto';
 
 @Controller('auth')
-@UseInterceptors(ClassSerializerInterceptor)
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private usersService: UserService,
+  ) {}
 
   @Post('login')
-  async login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
-    return this.authService.login(dto);
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.validateUser(loginDto);
+  }
+
+  @Post('register')
+  async register(@Body() createUserDto: CreateUserDto) {
+    const existing = await this.usersService.findByUsername(createUserDto.username);
+    if (existing) {
+      return { message: 'Kullanıcı zaten var' };
+    }
+
+    await this.usersService.create(createUserDto);
+    return { message: 'Kayıt başarılı' };
   }
 }

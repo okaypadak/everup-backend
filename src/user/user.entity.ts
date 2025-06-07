@@ -4,7 +4,8 @@ export enum UserRole {
   DEVELOPER = 'developer',
   TESTER = 'tester',
   DIRECTOR = 'director',
-  DEVOPS = 'devOps'
+  DEVOPS = 'devOps',
+  ADMIN = 'admin'
 }
 
 @Entity()
@@ -17,6 +18,9 @@ export class User {
 
   @Column()
   lastName: string;
+
+  @Column({ unique: true })
+  username: string;
 
   @Column({ unique: true })
   email: string;

@@ -1,31 +1,38 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { UserService } from '../user/user.service';
-import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
+import * as jwt from 'jsonwebtoken';
+import { UserService } from '../user/user.service';
+import { ResponseLoginDto } from './dto/response-login.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
-  constructor(
-    private readonly userService: UserService,
-    private readonly jwtService: JwtService
-  ) {}
+  constructor(private readonly userService: UserService) {}
 
-  async login(dto: LoginDto) {
-    const user = await this.userService.findByEmail(dto.email);
-    if (!user) throw new UnauthorizedException('Kullanıcı bulunamadı');
-    const isPasswordValid = await bcrypt.compare(dto.password, user.password);
-    if (!isPasswordValid) throw new UnauthorizedException('Şifre hatalı');
+  async validateUser(loginDto: LoginDto): Promise<ResponseLoginDto> {
+    // Kullanıcıyı e-mail ile bul
+    const user = await this.userService.findByUsername(loginDto.username);
+    if (!user) {
+      throw new UnauthorizedException('Kullanıcı bulunamadı');
+    }
 
-    const payload = {
-      sub: user.id,
-      role: user.role,
-      firstName: user.firstName,
-      lastName: user.lastName,
+    // Şifreyi kontrol et
+    const isMatch = await bcrypt.compare(loginDto.password, user.password);
+    if (!isMatch) {
+      throw new UnauthorizedException('Şifre yanlış');
+    }
+
+    // JWT token oluştur
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET as string,
+      { expiresIn: '2h' }
+    );
+
+    // DTO olarak dön
+    return {
+      message: 'Giriş başarılı',
+      token,
     };
-    const accessToken = this.jwtService.sign(payload);
-
-    // Sadece accessToken dönen bir obje
-    return { accessToken };
   }
 }

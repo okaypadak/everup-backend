@@ -1,31 +1,34 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { TaskModule } from './task/task.module';
 import { CommentModule } from './comment/comment.module';
 import { NotificationModule } from './notification/notification.module';
+import { ConfigModule } from '@nestjs/config';
+import { ProjectModule } from './project/project.module';
 
-// Veritabanı bağlantı ayarları örnektir, .env ile yönetebilirsin.
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',
       port: +(process.env.DB_PORT || 5432),
-      username: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASS || 'postgres',
-      database: process.env.DB_NAME || 'proje',
+      username: process.env.DB_USER || 'admin',
+      password: process.env.DB_PASS || 'sifre123',
+      database: process.env.DB_NAME || 'cycleup',
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: false,
+      dropSchema: false,
     }),
     UserModule,
     AuthModule,
     TaskModule,
+    ProjectModule,
     CommentModule,
     NotificationModule,
   ],
