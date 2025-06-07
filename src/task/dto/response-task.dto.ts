@@ -14,7 +14,6 @@ export class ProjectDto {
 // DependentTask DTO
 export class DependentTaskDto {
   @Expose() id: number;
-
 }
 
 // Ana Response DTO
@@ -40,7 +39,10 @@ export class ResponseTaskDto {
   @Type(() => ProjectDto)
   project: ProjectDto;
 
-  @Expose()
   @Type(() => DependentTaskDto)
+  @Expose()
   dependentTask?: DependentTaskDto;
+  get dependentTaskId(): number | null {
+    return this.dependentTask?.id ?? null;
+  }
 }
