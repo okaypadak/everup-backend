@@ -1,48 +1,61 @@
-import { Expose, Type } from 'class-transformer';
+import { Exclude, Expose, Type } from 'class-transformer';
+import { User } from '../../user/user.entity';
+import { Task, TaskLevel, TaskStatus, TaskType } from '../task.entity';
+import { Project } from '../../project/project.entity';
 
-// User DTO
-export class UserDto {
-  @Expose() id: number;
-}
-
-// Project DTO
-export class ProjectDto {
-  @Expose() id: number;
-  @Expose() name: string;
-}
-
-// DependentTask DTO
-export class DependentTaskDto {
-  @Expose() id: number;
-}
-
-// Ana Response DTO
 export class ResponseTaskDto {
-  @Expose() id: number;
-  @Expose() title: string;
-  @Expose() description: string;
-  @Expose() status: string;
-  @Expose() type: string;
-  @Expose() level: string;
-  @Expose() createdAt: Date;
-  @Expose() deadline: Date;
+  @Expose()
+  id: number;
 
   @Expose()
-  @Type(() => UserDto)
-  assignedTo: UserDto;
+  title: string;
 
   @Expose()
-  @Type(() => UserDto)
-  creator: UserDto;
+  description: string;
 
   @Expose()
-  @Type(() => ProjectDto)
-  project: ProjectDto;
+  status: TaskStatus;
 
-  @Type(() => DependentTaskDto)
   @Expose()
-  dependentTask?: DependentTaskDto;
+  type: TaskType;
+
+  @Expose()
+  level: TaskLevel;
+
+  @Expose()
+  createdAt: Date;
+
+  @Expose()
+  deadline?: Date;
+
+  @Exclude()
+  @Type(() => User)
+  assignedTo: User;
+
+  @Exclude()
+  @Type(() => User)
+  creator: User;
+
+  @Exclude()
+  @Type(() => Project)
+  project: Project;
+
+  @Exclude()
+  @Type(() => Task)
+  dependentTask?: Task;
+
+  @Expose({ name: 'dependentTaskId' })
   get dependentTaskId(): number | null {
     return this.dependentTask?.id ?? null;
   }
+
+  @Expose({ name: 'projectId' })
+  get getProject(): number | null {
+    return this.project?.id ?? null;
+  }
+
+  constructor(partial: Partial<Task>) {
+    Object.assign(this, partial);
+  }
 }
+

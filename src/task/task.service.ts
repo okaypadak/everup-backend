@@ -5,7 +5,6 @@ import { Task, TaskStatus } from './task.entity';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
-import { plainToInstance } from 'class-transformer';
 import { ResponseTaskDto } from './dto/response-task.dto';
 
 @Injectable()
@@ -58,7 +57,7 @@ export class TaskService {
   async findAllByUserOrRoleAndProject(
     user: { id: number; role: string },
     projectId: number
-  ): Promise<ResponseTaskDto> {
+  ): Promise<ResponseTaskDto> { // Artık DTO dönmüyoruz
     const filteredRoles = ['developer', 'tester', 'devops'];
     const userRole = user.role?.toLowerCase();
 
@@ -81,8 +80,9 @@ export class TaskService {
       });
     }
 
-    return plainToInstance(ResponseTaskDto, tasks, { excludeExtraneousValues: true });
+    return tasks.map(task => new ResponseTaskDto(task));
   }
+
 
   async findOne(id: number): Promise<Task> {
     const task = await this.taskRepository.findOne({
@@ -93,7 +93,6 @@ export class TaskService {
     return task;
   }
 
-  // (Opsiyonel) Bağımlı görev tamamlandıysa status READY yap
   async checkAndSetReady(taskId: number): Promise<void> {
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
@@ -108,4 +107,5 @@ export class TaskService {
       await this.taskRepository.save(task);
     }
   }
+
 }
