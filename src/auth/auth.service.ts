@@ -24,7 +24,12 @@ export class AuthService {
 
     // JWT token oluştur
     const token = jwt.sign(
-      { id: user.id, role: user.role },
+      {
+        id: user.id,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName
+      },
       process.env.JWT_SECRET as string,
       { expiresIn: '2h' }
     );

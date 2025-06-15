@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  CreateDateColumn,
+  ManyToMany,
+  JoinTable,
+  ManyToOne,
+} from 'typeorm';
 import { User } from '../user/user.entity';
 import { Task } from '../task/task.entity';
 
@@ -16,11 +25,15 @@ export class Project {
   @Column({ type: 'timestamp', nullable: false })
   startDate: Date;
 
-  @ManyToOne(() => User, { eager: true })
-  owner: User;
+  @ManyToMany(() => User, (user) => user.projects)
+  @JoinTable()
+  users: User[];
 
   @OneToMany(() => Task, (task) => task.project)
   tasks: Task[];
+
+  @ManyToOne(() => User, { eager: true })
+  creator: User;
 
   @CreateDateColumn()
   createdAt: Date;

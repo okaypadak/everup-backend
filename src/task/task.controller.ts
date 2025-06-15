@@ -32,12 +32,20 @@ export class TaskController {
   async findAllByProject(
     @Param('projectId') projectId: number,
     @Req() req: any
-  ): Promise<ResponseTaskDto> {
-    return this.taskService.findAllByUserOrRoleAndProject(req.user, Number(projectId));
+  ): Promise<ResponseTaskDto[]> {
+    return this.taskService.findAllByUserAndProject(Number(projectId));
+  }
+
+  @Get()
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async findAll(
+    @Req() req: any
+  ): Promise<ResponseTaskDto[]> {
+    return this.taskService.findAllByUser(req.user);
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Task> {
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<ResponseTaskDto> {
     return this.taskService.findOne(id);
   }
 }

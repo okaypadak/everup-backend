@@ -1,10 +1,13 @@
-import { IsNotEmpty, IsOptional, Matches } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateProjectDto {
-  @IsNotEmpty() name: string;
-  @IsOptional() description?: string;
+  @IsNotEmpty()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 
   @IsNotEmpty()
-  @Matches(/^\d{8}$/, { message: 'startDate yyyyMMdd formatında olmalı' })
-  startDate: string;
+  startDate: string; // "yyyyMMdd" formatı gelecek
 }

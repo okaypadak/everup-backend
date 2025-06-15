@@ -49,11 +49,6 @@ export class ResponseTaskDto {
     return this.dependentTask?.id ?? null;
   }
 
-  @Expose({ name: 'projectId' })
-  get getProject(): number | null {
-    return this.project?.id ?? null;
-  }
-
   constructor(partial: Partial<Task>) {
     Object.assign(this, partial);
   }

@@ -1,9 +1,20 @@
-import { Controller, Post, Body, Get, Param, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  ClassSerializerInterceptor,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { CreateProjectDto } from './dto/create-project.dto';
-import { ClassSerializerInterceptor } from '@nestjs/common';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ProjectResponseDto, ProjectUsersResponseDto } from './dto/project-response.dto';
+
 
 @Controller('projects')
 @UseGuards(RolesGuard)
@@ -13,9 +24,23 @@ export class ProjectController {
 
   @Post()
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  async create(@Body() dto: CreateProjectDto, @Req() req): Promise<{ success: boolean; message: string }> {
-    await this.projectService.create(dto, req.user);
-    return { success: true, message: 'Proje başarıyla oluşturuldu.' };
+  async create(
+    @Body() createDto: CreateProjectDto,
+    @Req() req: any,
+  ): Promise<ProjectResponseDto> {
+    return this.projectService.createProject(createDto, req.user.id);
   }
 
+  @Get()
+  async findAll(): Promise<ProjectResponseDto[]> {
+    return this.projectService.getAllProjects();
+  }
+
+    @Get(':projectId/users')
+    @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+    async getProjectUsers(
+      @Param('projectId') projectId: number,
+    ): Promise<ProjectUsersResponseDto> {
+      return await this.projectService.findProjectUsers(projectId);
+    }
 }
