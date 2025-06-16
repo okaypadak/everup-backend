@@ -27,7 +27,7 @@ export class TaskController {
     return { success: true, message: 'İşlem başarılı' };
   }
 
-  @Get(':projectId')
+  @Get('project/:projectId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async findAllByProject(
     @Param('projectId') projectId: number,
@@ -45,7 +45,14 @@ export class TaskController {
   }
 
   @Get(':id')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async findOne(@Param('id', ParseIntPipe) id: number): Promise<ResponseTaskDto> {
     return this.taskService.findOne(id);
+  }
+
+  @Get('detail/:id')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async getTaskDetail(@Param('id', ParseIntPipe) id: number) {
+    return this.taskService.findTaskDetailWithDependencies(id);
   }
 }

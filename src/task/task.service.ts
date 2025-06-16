@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Task, TaskStatus } from './task.entity';
+import { In, Not, Repository } from 'typeorm';
+import { Task, TaskLevel, TaskStatus, TaskType } from './task.entity';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { plainToInstance } from 'class-transformer';
-import { In } from 'typeorm';
+import { ResponseTaskDetailDto } from './dto/response-task-detail.dto';
 
 @Injectable()
 export class TaskService {
@@ -25,28 +25,31 @@ export class TaskService {
     user: { id: number },
   ): Promise<Task> {
     const task = new Task();
+
+    // Zorunlu alanlar
     task.title = createTaskDto.title;
     task.description = createTaskDto.description;
 
-    // Atanacak kullanıcıyı bul
-    const assignedTo = await this.userRepository.findOneOrFail({
+    // Göreve atanan kullanıcı
+    task.assignedTo = await this.userRepository.findOneOrFail({
       where: { id: createTaskDto.assignedTo },
     });
-    task.assignedTo = assignedTo;
 
-    // Creator (oluşturan kişi)
-    const creator = await this.userRepository.findOneOrFail({
+    // Görevi oluşturan kullanıcı
+    task.creator = await this.userRepository.findOneOrFail({
       where: { id: user.id },
     });
-    task.creator = creator;
 
-    // Proje ilişkisi
-    const project = await this.projectRepository.findOneOrFail({
+    // İlgili proje
+    task.project = await this.projectRepository.findOneOrFail({
       where: { id: createTaskDto.project },
     });
-    task.project = project;
 
-    // Bağımlı görev
+    // Görev tipi, seviyesi ve varsayılan statü
+    task.type = createTaskDto.type ?? TaskType.TASK;
+    task.level = createTaskDto.level ?? TaskLevel.NORMAL;
+
+    // Opsiyonel: Bağımlı görev
     if (createTaskDto.dependentTaskId) {
       const depTask = await this.taskRepository.findOneOrFail({
         where: { id: createTaskDto.dependentTaskId },
@@ -57,23 +60,31 @@ export class TaskService {
       task.status = TaskStatus.READY;
     }
 
+    // Opsiyonel: Son teslim tarihi
+    if (createTaskDto.deadline) {
+      task.deadline = new Date(createTaskDto.deadline);
+    }
+
     return this.taskRepository.save(task);
   }
 
-
-  async findAllByUserAndProject(
-    projectId: number,
-  ): Promise<ResponseTaskDto[]> {
+  async findAllByUserAndProject(projectId: number): Promise<ResponseTaskDto[]> {
     const tasks = await this.taskRepository.find({
       where: {
         project: { id: projectId },
-        status: In([TaskStatus.READY, TaskStatus.IN_PROGRESS, TaskStatus.WAITING]),
+        status: In([
+          TaskStatus.READY,
+          TaskStatus.IN_PROGRESS,
+          TaskStatus.WAITING,
+        ]),
       },
       relations: ['project', 'dependentTask'],
       order: { createdAt: 'DESC' },
     });
 
-    return plainToInstance(ResponseTaskDto, tasks, { excludeExtraneousValues: true });
+    return plainToInstance(ResponseTaskDto, tasks, {
+      excludeExtraneousValues: true,
+    });
   }
 
   async findAllByUser(user: {
@@ -99,7 +110,56 @@ export class TaskService {
 
     if (!task) throw new NotFoundException('Görev bulunamadı.');
 
-    return plainToInstance(ResponseTaskDto, task, { excludeExtraneousValues: true });
+    return plainToInstance(ResponseTaskDto, task, {
+      excludeExtraneousValues: true,
+    });
   }
 
+  async findTaskDetailWithDependencies(
+    taskId: number,
+  ): Promise<ResponseTaskDetailDto> {
+    const task = await this.taskRepository.findOne({
+      where: { id: taskId },
+      relations: ['assignedTo', 'creator', 'project', 'dependentTask'],
+    });
+
+    if (!task) {
+      throw new NotFoundException('Görev bulunamadı');
+    }
+
+    let dependentTasks: { id: number; title: string; status: string }[] = [];
+
+    if (task.dependentTask?.id) {
+      dependentTasks = await this.taskRepository.find({
+        where: {
+          dependentTask: { id: task.dependentTask.id },
+          id: Not(task.id),
+        },
+        select: ['id', 'title', 'status'],
+        order: { createdAt: 'DESC' },
+      });
+    }
+
+    const response = {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      createdAt: task.createdAt,
+      status: task.status,
+      type: task.type,
+      level: task.level,
+      deadline: task.deadline,
+      creator: {
+        name: `${task.creator.firstName} ${task.creator.lastName}`,
+      },
+      project: {
+        name: task.project.name,
+      },
+      dependencies: dependentTasks,
+    };
+
+    return plainToInstance(ResponseTaskDetailDto, response, {
+      excludeExtraneousValues: true,
+    });
+  }
 }
