@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Not, Repository } from 'typeorm';
+import { In, Not, IsNull, Repository } from 'typeorm';
 import { Task, TaskLevel, TaskStatus, TaskType } from './task.entity';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
@@ -8,6 +8,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { plainToInstance } from 'class-transformer';
 import { ResponseTaskDetailDto } from './dto/response-task-detail.dto';
+
 
 @Injectable()
 export class TaskService {
@@ -130,14 +131,35 @@ export class TaskService {
     let dependentTasks: { id: number; title: string; status: string }[] = [];
 
     if (task.dependentTask?.id) {
-      dependentTasks = await this.taskRepository.find({
-        where: {
-          dependentTask: { id: task.dependentTask.id },
-          id: Not(task.id),
-        },
-        select: ['id', 'title', 'status'],
-        order: { createdAt: 'DESC' },
+      const dependentId = task.dependentTask.id;
+
+      const parentTask = await this.taskRepository.findOne({
+        where: { id: dependentId },
+        relations: ['dependentTask'],
       });
+
+      if (!parentTask?.dependentTask) {
+        // Parent null ise tüm kök görevleri getir (root level: dependentTask IS NULL)
+        dependentTasks = await this.taskRepository.find({
+          where: {
+            dependentTask: IsNull(),
+            id: Not(task.id), // Kendisi hariç tutulsun
+          },
+          select: ['id', 'title', 'status'],
+          order: { createdAt: 'DESC' },
+        });
+      } else {
+        const rootDepId = parentTask.dependentTask.id;
+
+        dependentTasks = await this.taskRepository.find({
+          where: {
+            dependentTask: { id: rootDepId },
+            id: Not(task.id),
+          },
+          select: ['id', 'title', 'status'],
+          order: { createdAt: 'DESC' },
+        });
+      }
     }
 
     const response = {
@@ -162,4 +184,6 @@ export class TaskService {
       excludeExtraneousValues: true,
     });
   }
+
+
 }
