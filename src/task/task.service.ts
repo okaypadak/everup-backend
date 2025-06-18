@@ -8,6 +8,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { plainToInstance } from 'class-transformer';
 import { ResponseTaskDetailDto } from './dto/response-task-detail.dto';
+import { Comment } from '../comment/comment.entity';
 
 
 @Injectable()
@@ -19,6 +20,8 @@ export class TaskService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Project)
     private readonly projectRepository: Repository<Project>,
+    @InjectRepository(Comment)
+    private readonly commentRepo: Repository<Comment>,
   ) {}
 
   async create(
@@ -116,6 +119,7 @@ export class TaskService {
     });
   }
 
+
   async findTaskDetailWithDependencies(
     taskId: number,
   ): Promise<ResponseTaskDetailDto> {
@@ -139,11 +143,11 @@ export class TaskService {
       });
 
       if (!parentTask?.dependentTask) {
-        // Parent null ise tüm kök görevleri getir (root level: dependentTask IS NULL)
+        // Parent null ise tüm kök görevleri getir
         dependentTasks = await this.taskRepository.find({
           where: {
             dependentTask: IsNull(),
-            id: Not(task.id), // Kendisi hariç tutulsun
+            id: Not(task.id),
           },
           select: ['id', 'title', 'status'],
           order: { createdAt: 'DESC' },
@@ -162,6 +166,13 @@ export class TaskService {
       }
     }
 
+    // ✅ Yorumları çek
+    const comments = await this.commentRepo.find({
+      where: { task: { id: taskId } },
+      order: { createdAt: 'ASC' },
+      relations: ['author', 'parent'], // ← bunu ekle!
+    });
+
     const response = {
       id: task.id,
       title: task.title,
@@ -171,19 +182,23 @@ export class TaskService {
       type: task.type,
       level: task.level,
       deadline: task.deadline,
-      creator: {
-        name: `${task.creator.firstName} ${task.creator.lastName}`,
-      },
-      project: {
-        name: task.project.name,
-      },
+      creator: `${task.creator.firstName} ${task.creator.lastName}`,
+      project: task.project.name,
       dependencies: dependentTasks,
+      comments: comments.map((comment) => ({
+        id: comment.id,
+        content: comment.content,
+        createdAt: comment.createdAt,
+        author: `${comment.author.firstName} ${comment.author.lastName}`,
+        parentId: comment.parent?.id ?? null,
+      })),
     };
 
     return plainToInstance(ResponseTaskDetailDto, response, {
       excludeExtraneousValues: true,
     });
   }
+
 
 
 }

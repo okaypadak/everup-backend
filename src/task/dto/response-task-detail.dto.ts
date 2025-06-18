@@ -1,5 +1,6 @@
 import { Expose, Type } from 'class-transformer';
 import { DependentTaskDto } from './dependent-task.dto';
+import { CommentDto } from '../../comment/dto/comment.dto';
 
 class CreatorInfoDto {
   @Expose()
@@ -47,4 +48,8 @@ export class ResponseTaskDetailDto {
   @Expose()
   @Type(() => DependentTaskDto)
   dependencies: DependentTaskDto[];
+
+  @Expose()
+  @Type(() => CommentDto)
+  comments: CommentDto[];
 }

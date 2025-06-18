@@ -1,4 +1,7 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Comment } from './comment.entity';
@@ -19,23 +22,17 @@ export class CommentService {
     return this.commentRepo.find({
       where: { task: { id: taskId } },
       order: { createdAt: 'ASC' },
-      relations: ['author'],
+      relations: ['author', 'parent'],
     });
   }
 
   async createComment(dto: CreateCommentDto, author: User): Promise<Comment> {
     const task = await this.taskRepo.findOne({
       where: { id: dto.taskId },
-      relations: ['assignedTo'],
     });
-    if (!task) throw new NotFoundException('Task bulunamadı');
 
-    // Yetki: Sadece task'a atanmış kişi veya director, tester ekleyebilsin
-    if (
-      task.assignedTo.id !== author.id &&
-      !['director', 'tester'].includes(author.role)
-    ) {
-      throw new ForbiddenException('Bu task’a yorum ekleme yetkiniz yok');
+    if (!task) {
+      throw new NotFoundException('Görev bulunamadı');
     }
 
     const comment = this.commentRepo.create({
@@ -43,6 +40,19 @@ export class CommentService {
       task,
       author,
     });
+
+    if (dto.parentId) {
+      const parent = await this.commentRepo.findOne({
+        where: { id: dto.parentId },
+      });
+
+      if (!parent) {
+        throw new NotFoundException('Üst yorum bulunamadı');
+      }
+
+      comment.parent = parent;
+    }
+
     return this.commentRepo.save(comment);
   }
 }
