@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn, OneToMany } from 'typeorm';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
+import { TaskDependency } from './task-dependency.entity';
 
 export enum TaskType {
   TASK = 'task',
@@ -69,10 +70,14 @@ export class Task {
   })
   level: TaskLevel;
 
-  @ManyToOne(() => Task, { nullable: true })
-  @JoinColumn({ name: 'dependentTaskId' })
-  dependentTask?: Task;
-
   @Column({ type: 'timestamp', nullable: true })
   deadline?: Date;
+
+  @OneToMany(() => TaskDependency, dep => dep.task, { cascade: true })
+  dependencies: TaskDependency[];
+
+  @OneToMany(() => TaskDependency, dep => dep.dependsOn, { cascade: true })
+  dependents: TaskDependency[];
+
+
 }

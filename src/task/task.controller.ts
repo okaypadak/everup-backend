@@ -6,14 +6,14 @@ import {
   Param,
   ParseIntPipe,
   Req,
-  UseGuards
+  UseGuards, Patch,
 } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { CreateTaskDto } from './dto/create-task.dto';
-import { Task } from './task.entity';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ResponseTaskDto } from './dto/response-task.dto';
+import { TaskStatus } from './task.entity';
 
 @Controller('tasks')
 @UseGuards(RolesGuard)
@@ -25,6 +25,12 @@ export class TaskController {
   async create(@Req() req: any, @Body() createTaskDto: CreateTaskDto) {
     await this.taskService.create(createTaskDto, req.user);
     return { success: true, message: 'İşlem başarılı' };
+  }
+
+  @Patch(':id/status')
+  @Roles('admin', 'director', 'developer')
+  async updateStatus(@Param('id') id: number, @Body('status') status: TaskStatus) {
+    return this.taskService.updateStatus(id, status)
   }
 
   @Get('project/:projectId')
@@ -42,12 +48,6 @@ export class TaskController {
     @Req() req: any
   ): Promise<ResponseTaskDto[]> {
     return this.taskService.findAllByUser(req.user);
-  }
-
-  @Get(':id')
-  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<ResponseTaskDto> {
-    return this.taskService.findOne(id);
   }
 
   @Get('detail/:id')

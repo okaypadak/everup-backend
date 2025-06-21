@@ -2,6 +2,7 @@ import { Exclude, Expose, Type } from 'class-transformer';
 import { User } from '../../user/user.entity';
 import { Task, TaskLevel, TaskStatus, TaskType } from '../task.entity';
 import { Project } from '../../project/project.entity';
+import { TaskDependency } from '../task-dependency.entity';
 
 export class ResponseTaskDto {
   @Expose()
@@ -41,16 +42,16 @@ export class ResponseTaskDto {
   project: Project;
 
   @Exclude()
-  @Type(() => Task)
-  dependentTask?: Task;
+  @Type(() => TaskDependency)
+  dependencies?: TaskDependency[];
 
-  @Expose({ name: 'dependentTaskId' })
-  get dependentTaskId(): number | null {
-    return this.dependentTask?.id ?? null;
+  @Expose({ name: 'dependencyIds' })
+  get dependencyIds(): number[] {
+    if (!this.dependencies) return [];
+    return this.dependencies.map(dep => dep.dependsOn?.id).filter(Boolean);
   }
 
   constructor(partial: Partial<Task>) {
     Object.assign(this, partial);
   }
 }
-

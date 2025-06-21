@@ -5,6 +5,9 @@ import {
   IsOptional,
   IsNumber,
   IsDateString,
+  IsArray,
+  ArrayNotEmpty,
+  ArrayUnique,
 } from 'class-validator';
 import { TaskLevel, TaskType } from '../task.entity';
 
@@ -32,10 +35,13 @@ export class CreateTaskDto {
   level?: TaskLevel;
 
   @IsOptional()
-  @IsNumber()
-  dependentTaskId?: number;
-
-  @IsOptional()
   @IsDateString()
   deadline?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @IsNumber({}, { each: true })
+  dependencyIds?: number[];
 }

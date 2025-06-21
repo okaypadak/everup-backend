@@ -2,16 +2,6 @@ import { Expose, Type } from 'class-transformer';
 import { DependentTaskDto } from './dependent-task.dto';
 import { CommentDto } from '../../comment/dto/comment.dto';
 
-class CreatorInfoDto {
-  @Expose()
-  name: string;
-}
-
-class ProjectInfoDto {
-  @Expose()
-  name: string;
-}
-
 export class ResponseTaskDetailDto {
   @Expose()
   id: number;
@@ -38,12 +28,10 @@ export class ResponseTaskDetailDto {
   deadline: Date;
 
   @Expose()
-  @Type(() => CreatorInfoDto)
-  creator: CreatorInfoDto;
+  creator: string;
 
   @Expose()
-  @Type(() => ProjectInfoDto)
-  project: ProjectInfoDto;
+  project: string;
 
   @Expose()
   @Type(() => DependentTaskDto)
