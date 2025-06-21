@@ -68,10 +68,36 @@ export class TaskService {
   }
 
   async updateStatus(id: number, status: TaskStatus): Promise<Task> {
-    const task = await this.taskRepository.findOneBy({ id });
+    const task = await this.taskRepository.findOne({
+      where: { id },
+      relations: ['dependencies', 'dependencies.dependsOn'],
+    });
     if (!task) throw new NotFoundException('Görev bulunamadı');
+
     task.status = status;
-    return this.taskRepository.save(task);
+    await this.taskRepository.save(task);
+
+    // 🧠 Sadece 'Completed' yapıldığında kontrol et
+    if (status === TaskStatus.COMPLETED) {
+      // Bu göreve bağlı olan görevleri bul (yani kimler bu task'a bağımlı?)
+      const dependents = await this.taskDepRepo.find({
+        where: { dependsOn: { id: task.id } },
+        relations: ['task', 'task.dependencies', 'task.dependencies.dependsOn'],
+      });
+
+      for (const dep of dependents) {
+        const dependentTask = dep.task;
+
+        const allDepsCompleted = dependentTask.dependencies.every(d => d.dependsOn.status === TaskStatus.COMPLETED);
+
+        if (allDepsCompleted && dependentTask.status === TaskStatus.WAITING) {
+          dependentTask.status = TaskStatus.READY;
+          await this.taskRepository.save(dependentTask);
+        }
+      }
+    }
+
+    return task;
   }
 
   async findAllByUserAndProject(projectId: number): Promise<ResponseTaskDto[]> {
@@ -101,7 +127,7 @@ export class TaskService {
         'creator',
         'project',
         'dependencies',
-        'dependencies.dependsOn', // 🔑 Bu satır sayesinde dependencyId'ler çalışır
+        'dependencies.dependsOn',
       ],
       order: { createdAt: 'DESC' },
     });
