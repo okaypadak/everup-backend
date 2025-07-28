@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
 
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { TaskModule } from './task/task.module';
 import { CommentModule } from './comment/comment.module';
 import { NotificationModule } from './notification/notification.module';
-import { ConfigModule } from '@nestjs/config';
 import { ProjectModule } from './project/project.module';
 import { CustomerModule } from './customer/customer.module';
 
@@ -25,6 +25,14 @@ import { CustomerModule } from './customer/customer.module';
       autoLoadEntities: true,
       synchronize: true,
       dropSchema: true,
+      ssl: process.env.DB_SSL === 'true',
+      extra: process.env.DB_SSL === 'true'
+        ? {
+          ssl: {
+            rejectUnauthorized: false,
+          },
+        }
+        : {},
     }),
     UserModule,
     AuthModule,
