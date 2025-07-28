@@ -28,7 +28,7 @@ RUN npm install --only=production
 COPY --from=builder /app/dist ./dist
 
 # Env dosyası varsa (isteğe bağlı)
-# COPY .env .env
+COPY .env .env
 
 # Giriş noktası
 CMD ["node", "dist/main"]
