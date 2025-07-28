@@ -34,4 +34,4 @@ COPY --from=builder /app/dist ./dist
 CMD ["node", "dist/main"]
 
 # Uygulama hangi portu dinliyorsa o expose edilir
-EXPOSE 3001
+EXPOSE 9120
