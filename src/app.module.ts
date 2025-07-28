@@ -32,7 +32,7 @@ console.log('--------------------------------');
       password: process.env.DB_PASS || 'sifre123',
       database: process.env.DB_NAME || 'everup',
       autoLoadEntities: true,
-      synchronize: false,
+      synchronize: true,
       dropSchema: false,
       ssl: process.env.DB_SSL === 'true',
       extra: process.env.DB_SSL === 'true'
