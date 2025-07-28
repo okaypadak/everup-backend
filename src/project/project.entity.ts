@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from '../user/user.entity';
 import { Task } from '../task/task.entity';
+import { Customer } from '../customer/customer.entity';
 
 @Entity()
 export class Project {
@@ -34,6 +35,9 @@ export class Project {
 
   @ManyToOne(() => User, { eager: true })
   creator: User;
+
+  @OneToMany(() => Customer, (customer) => customer.project)
+  customers: Customer[];
 
   @CreateDateColumn()
   createdAt: Date;

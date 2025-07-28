@@ -8,6 +8,7 @@ import { CommentModule } from './comment/comment.module';
 import { NotificationModule } from './notification/notification.module';
 import { ConfigModule } from '@nestjs/config';
 import { ProjectModule } from './project/project.module';
+import { CustomerModule } from './customer/customer.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ProjectModule } from './project/project.module';
     ProjectModule,
     CommentModule,
     NotificationModule,
+    CustomerModule,
   ],
   controllers: [],
   providers: [],

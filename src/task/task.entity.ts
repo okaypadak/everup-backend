@@ -1,7 +1,17 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+  JoinColumn,
+  OneToMany,
+  OneToOne,
+} from 'typeorm';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
 import { TaskDependency } from './task-dependency.entity';
+import { Customer } from '../customer/customer.entity';
 
 export enum TaskType {
   TASK = 'task',
@@ -15,6 +25,15 @@ export enum TaskStatus {
   IN_PROGRESS = 'In Progress',
   COMPLETED = 'Completed',
   WAITING = 'Waiting'
+}
+
+export enum MarketingTaskStatus {
+  NEW_LEAD = 'NEW_LEAD',
+  CONTACTED = 'CONTACTED',
+  UNREACHABLE = 'UNREACHABLE',
+  IN_NEGOTIATION = 'IN_NEGOTIATION',
+  WON = 'WON',
+  LOST = 'LOST'
 }
 
 export enum TaskLevel {
@@ -70,6 +89,13 @@ export class Task {
   })
   level: TaskLevel;
 
+  @Column({
+    type: 'enum',
+    enum: MarketingTaskStatus,
+    default: MarketingTaskStatus.NEW_LEAD,
+  })
+  marketingStatus: MarketingTaskStatus;
+
   @Column({ type: 'timestamp', nullable: true })
   deadline?: Date;
 
@@ -79,5 +105,7 @@ export class Task {
   @OneToMany(() => TaskDependency, dep => dep.dependsOn, { cascade: true })
   dependents: TaskDependency[];
 
-
+  @OneToOne(() => Customer, (customer) => customer.task)
+  @JoinColumn()
+  customer: Customer;
 }
