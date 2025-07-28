@@ -4,21 +4,32 @@ import { Repository } from 'typeorm';
 import { User, UserRole } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
+import { CustomMailService } from '../mail/mail.service';
+import { MessageDto } from '../common/dto/message.dto';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
-    private readonly userRepo: Repository<User>
+    private readonly userRepo: Repository<User>,
+    private readonly mailService: CustomMailService,
   ) {}
 
-  async create(dto: CreateUserDto): Promise<User> {
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+  async create(dto: CreateUserDto): Promise<MessageDto> {
+    const password = dto.password || this.generatePassword()
+    const passwordHash = await bcrypt.hash(password, 10)
+
     const user = this.userRepo.create({
       ...dto,
       password: passwordHash,
-    });
-    return this.userRepo.save(user);
+    })
+
+    const savedUser = await this.userRepo.save(user)
+
+    // Mail gönderimi
+    await this.mailService.sendPasswordEmail(savedUser.email, password)
+
+    return new MessageDto('İşlem başarılı', '00')
   }
 
   async findById(id: number): Promise<User> {
@@ -31,22 +42,19 @@ export class UserService {
     return this.userRepo.findOne({ where: { email } });
   }
 
-  async findByUsername(username: string): Promise<User | null> {
-    return this.userRepo.findOne({ where: { username } });
-  }
 
   async onModuleInit() {
 
     const adminExists = await this.userRepo.findOne({ where: { role: UserRole.ADMIN } });
 
     if (!adminExists) {
+
       const adminUser: CreateUserDto = {
-        username: 'admin',
-        email: 'kypdkz@gmail.com',
+        email: 'padakyazilim@gmail.com',
         password: 'padaK06##',
         role: UserRole.ADMIN,
         firstName: 'Okay',
-        lastName: 'Padak',
+        lastName: 'Padak'
       };
 
       await this.create(adminUser);
@@ -54,5 +62,10 @@ export class UserService {
     } else {
       console.log('ℹ️ Admin zaten mevcut');
     }
+  }
+
+  private generatePassword(): string {
+    const part = Math.random().toString(36).slice(-8)
+    return part + 'A#'
   }
 }

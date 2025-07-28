@@ -18,30 +18,19 @@ export class ProjectService {
     private readonly userRepo: Repository<User>
   ) {}
 
-  async createProject(createDto: CreateProjectDto, userId: number): Promise<ProjectResponseDto> {
+  async createProject(createDto: CreateProjectDto, userId: number): Promise<void> {
     // 1. Kullanıcıyı bul
     const creator = await this.userRepo.findOneByOrFail({ id: userId });
 
-    // 2. Yeni proje oluştur
+    // 2. Yeni proje oluştur ve kullanıcıyı ilişkilendir
     const project = this.projectRepo.create({
       ...createDto,
       startDate: new Date(createDto.startDate),
-      users: [creator], // Oluşturan kullanıcıyı proje üyelerine ekle
+      users: [creator],
     });
 
     // 3. Projeyi kaydet
-    const savedProject = await this.projectRepo.save(project);
-
-    // 4. İlişkileri yükle (taze veri için)
-    const projectWithRelations = await this.projectRepo.findOne({
-      where: { id: savedProject.id },
-      relations: ['users', 'tasks'],
-    });
-
-    // 5. DTO'ya dönüştürerek döndür
-    return plainToInstance(ProjectResponseDto, projectWithRelations, {
-      excludeExtraneousValues: true,
-    });
+    await this.projectRepo.save(project);
   }
 
   async getAllProjects(): Promise<ProjectResponseDto[]> {

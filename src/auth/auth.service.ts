@@ -11,7 +11,7 @@ export class AuthService {
 
   async validateUser(loginDto: LoginDto): Promise<ResponseLoginDto> {
     // Kullanıcıyı e-mail ile bul
-    const user = await this.userService.findByUsername(loginDto.username);
+    const user = await this.userService.findByEmail(loginDto.email);
     if (!user) {
       throw new UnauthorizedException('Kullanıcı bulunamadı');
     }

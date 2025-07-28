@@ -14,6 +14,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ProjectResponseDto, ProjectUsersResponseDto } from './dto/project-response.dto';
+import { MessageDto } from '../common/dto/message.dto';
 
 
 @Controller('projects')
@@ -27,8 +28,9 @@ export class ProjectController {
   async create(
     @Body() createDto: CreateProjectDto,
     @Req() req: any,
-  ): Promise<ProjectResponseDto> {
-    return this.projectService.createProject(createDto, req.user.id);
+  ): Promise<MessageDto> {
+    await this.projectService.createProject(createDto, req.user.id);
+    return new MessageDto('Proje başarıyla oluşturuldu');
   }
 
   @Get()

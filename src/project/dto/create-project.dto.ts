@@ -9,5 +9,5 @@ export class CreateProjectDto {
   description?: string;
 
   @IsNotEmpty()
-  startDate: string; // "yyyyMMdd" formatı gelecek
+  startDate: string;
 }

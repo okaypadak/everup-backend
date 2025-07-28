@@ -18,7 +18,7 @@ export class AuthController {
 
   @Post('register')
   async register(@Body() createUserDto: CreateUserDto) {
-    const existing = await this.usersService.findByUsername(createUserDto.username);
+    const existing = await this.usersService.findByEmail(createUserDto.email);
     if (existing) {
       return { message: 'Kullanıcı zaten var' };
     }
