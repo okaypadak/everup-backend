@@ -1,13 +1,16 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToMany } from 'typeorm';
 import { Project } from '../project/project.entity';
+import { ProjectUser } from '../project/project-user.entity';
 
 export enum UserRole {
   DEVELOPER = 'developer',
   TESTER = 'tester',
   DIRECTOR = 'director',
   DEVOPS = 'devOps',
-  ADMIN = 'admin'
+  ADMIN = 'admin',
+  MARKETER = 'marketer'
 }
+
 
 @Entity()
 export class User {
@@ -29,6 +32,6 @@ export class User {
   @Column({ type: 'enum', enum: UserRole })
   role: UserRole;
 
-  @ManyToMany(() => Project, (project) => project.users)
-  projects: Project[];
+  @OneToMany(() => ProjectUser, (pu) => pu.user)
+  projectLinks: ProjectUser[];
 }

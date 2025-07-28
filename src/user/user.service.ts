@@ -6,6 +6,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 import { CustomMailService } from '../mail/mail.service';
 import { MessageDto } from '../common/dto/message.dto';
+import { ResponseUserDto } from './dto/response-user.dto';
 
 @Injectable()
 export class UserService {
@@ -14,6 +15,27 @@ export class UserService {
     private readonly userRepo: Repository<User>,
     private readonly mailService: CustomMailService,
   ) {}
+
+  async onModuleInit() {
+
+    const adminExists = await this.userRepo.findOne({ where: { role: UserRole.ADMIN } });
+
+    if (!adminExists) {
+
+      const adminUser: CreateUserDto = {
+        email: 'padakyazilim@gmail.com',
+        password: 'padaK06##',
+        role: UserRole.ADMIN,
+        firstName: 'Okay',
+        lastName: 'Padak'
+      };
+
+      await this.create(adminUser);
+      console.log('✅ Admin kullanıcısı oluşturuldu');
+    } else {
+      console.log('ℹ️ Admin zaten mevcut');
+    }
+  }
 
   async create(dto: CreateUserDto): Promise<MessageDto> {
     const password = dto.password || this.generatePassword()
@@ -43,25 +65,9 @@ export class UserService {
   }
 
 
-  async onModuleInit() {
-
-    const adminExists = await this.userRepo.findOne({ where: { role: UserRole.ADMIN } });
-
-    if (!adminExists) {
-
-      const adminUser: CreateUserDto = {
-        email: 'padakyazilim@gmail.com',
-        password: 'padaK06##',
-        role: UserRole.ADMIN,
-        firstName: 'Okay',
-        lastName: 'Padak'
-      };
-
-      await this.create(adminUser);
-      console.log('✅ Admin kullanıcısı oluşturuldu');
-    } else {
-      console.log('ℹ️ Admin zaten mevcut');
-    }
+  async findAll(): Promise<ResponseUserDto[]> {
+    const users = await this.userRepo.find();
+    return users.map((user) => new ResponseUserDto(user));
   }
 
   private generatePassword(): string {

@@ -1,9 +1,9 @@
 import {
   Body,
   ClassSerializerInterceptor,
-  Controller,
+  Controller, Delete,
   Get,
-  Param,
+  Param, ParseIntPipe,
   Post,
   Req,
   UseGuards,
@@ -15,6 +15,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ProjectResponseDto, ProjectUsersResponseDto } from './dto/project-response.dto';
 import { MessageDto } from '../common/dto/message.dto';
+import { AssignUserDto } from './dto/assign-user.dto';
 
 
 @Controller('projects')
@@ -45,4 +46,22 @@ export class ProjectController {
     ): Promise<ProjectUsersResponseDto> {
       return await this.projectService.findProjectUsers(projectId);
     }
+
+  @Post(':projectId/assign-user')
+  async assignUser(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Body() dto: AssignUserDto,
+  ): Promise<{ message: string }> {
+    await this.projectService.assignUserToProject(projectId, dto);
+    return { message: 'Kullanıcı projeye atandı' };
+  }
+
+  @Delete(':projectId/users/:userId')
+  async removeUserFromProject(
+    @Param('projectId') projectId: number,
+    @Param('userId') userId: number
+  ): Promise<MessageDto> {
+    await this.projectService.removeUserFromProject(projectId, userId)
+    return new MessageDto('Kullanıcı projeden çıkarıldı')
+  }
 }

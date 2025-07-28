@@ -11,6 +11,7 @@ import {
 import { User } from '../user/user.entity';
 import { Task } from '../task/task.entity';
 import { Customer } from '../customer/customer.entity';
+import { ProjectUser } from './project-user.entity';
 
 @Entity()
 export class Project {
@@ -26,19 +27,15 @@ export class Project {
   @Column({ type: 'timestamp', nullable: false })
   startDate: Date;
 
-  @ManyToMany(() => User, (user) => user.projects)
-  @JoinTable()
-  users: User[];
-
   @OneToMany(() => Task, (task) => task.project)
   tasks: Task[];
-
-  @ManyToOne(() => User, { eager: true })
-  creator: User;
 
   @OneToMany(() => Customer, (customer) => customer.project)
   customers: Customer[];
 
   @CreateDateColumn()
   createdAt: Date;
+
+  @OneToMany(() => ProjectUser, (pu) => pu.project)
+  userLinks: ProjectUser[];
 }

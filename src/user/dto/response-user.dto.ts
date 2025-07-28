@@ -1,10 +1,23 @@
 import { Expose } from 'class-transformer';
-import { UserRole } from '../user.entity';
+import { User } from '../user.entity';
 
 export class ResponseUserDto {
-  @Expose() id: number;
-  @Expose() firstName: string;
-  @Expose() lastName: string;
-  @Expose() email: string;
-  @Expose() role: UserRole;
+  @Expose()
+  id: number;
+
+  @Expose()
+  firstName: string;
+
+  @Expose()
+  lastName: string;
+
+  @Expose()
+  email: string;
+
+  constructor(user: User) {
+    this.id = user.id;
+    this.firstName = user.firstName;
+    this.lastName = user.lastName;
+    this.email = user.email;
+  }
 }

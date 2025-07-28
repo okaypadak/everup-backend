@@ -19,4 +19,9 @@ export class UserController {
   async findById(@Param('id') id: number): Promise<ResponseUserDto> {
     return this.userService.findById(Number(id));
   }
+
+  @Get()
+  async findAll(): Promise<ResponseUserDto[]> {
+    return this.userService.findAll();
+  }
 }
