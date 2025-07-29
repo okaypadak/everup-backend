@@ -74,4 +74,14 @@ export class UserService {
     const part = Math.random().toString(36).slice(-8)
     return part + 'A#'
   }
+
+  async updateUserRole(userId: number, newRole: UserRole): Promise<MessageDto> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Kullanıcı bulunamadı');
+
+    user.role = newRole;
+    await this.userRepo.save(user);
+
+    return new MessageDto('Rol başarıyla güncellendi', '00');
+  }
 }
