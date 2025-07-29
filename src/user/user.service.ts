@@ -32,8 +32,6 @@ export class UserService {
 
       await this.create(adminUser);
       console.log('✅ Admin kullanıcısı oluşturuldu');
-    } else {
-      console.log('ℹ️ Admin zaten mevcut');
     }
   }
 

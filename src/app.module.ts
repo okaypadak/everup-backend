@@ -9,6 +9,8 @@ import { CommentModule } from './comment/comment.module';
 import { NotificationModule } from './notification/notification.module';
 import { ProjectModule } from './project/project.module';
 import { CustomerModule } from './customer/customer.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { DocumentModule } from './document/document.module';
 
 console.log('✅ ENV VALUES ------------------');
 console.log('DB_HOST:', process.env.DB_HOST);
@@ -43,6 +45,7 @@ console.log('--------------------------------');
         }
         : {},
     }),
+    MongooseModule.forRoot(process.env.MONGO_URI || 'mongodb://localhost:27017/everUp'),
     UserModule,
     AuthModule,
     TaskModule,
@@ -50,6 +53,7 @@ console.log('--------------------------------');
     CommentModule,
     NotificationModule,
     CustomerModule,
+    DocumentModule,
   ],
   controllers: [],
   providers: [],
