@@ -193,11 +193,17 @@ export class TaskService {
   }
 
   async delete(id: number, user: User): Promise<void> {
-    const task = await this.taskRepository.findOne({ where: { id }, relations: ['createdBy'] });
-    if (!task) throw new NotFoundException('Task bulunamadı');
+    const task = await this.taskRepository.findOne({
+      where: { id },
+      relations: ['creator'],
+    });
 
-    // sadece task sahibi veya yetkili roller silebilsin
-    if (task.createdBy.id !== user.id && !['admin', 'director'].includes(user.role)) {
+    if (!task) {
+      throw new NotFoundException('Task bulunamadı');
+    }
+
+    // sadece creator veya admin/director silebilsin
+    if (task.creator.id !== user.id && !['admin', 'director'].includes(user.role)) {
       throw new ForbiddenException('Bu taskı silme yetkiniz yok');
     }
 
