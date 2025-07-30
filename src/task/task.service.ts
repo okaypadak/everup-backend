@@ -51,7 +51,7 @@ export class TaskService {
     }
 
     // ✅ Çoklu label desteği
-    if (createTaskDto.labelIds?.length > 0) {
+    if (Array.isArray(createTaskDto.labelIds) && createTaskDto.labelIds.length > 0) {
       const labels = await this.labelRepo.findBy({ id: In(createTaskDto.labelIds) });
       task.labels = labels;
     }
@@ -59,7 +59,7 @@ export class TaskService {
     const savedTask = await this.taskRepository.save(task);
 
     // ➕ Bağımlı görevleri ekle (çoklu destek)
-    if (createTaskDto.dependencyIds && createTaskDto.dependencyIds.length > 0) {
+    if (Array.isArray(createTaskDto.dependencyIds) && createTaskDto.dependencyIds.length > 0) {
       const deps = createTaskDto.dependencyIds.map(depId => {
         const dep = new TaskDependency();
         dep.task = savedTask;
