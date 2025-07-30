@@ -23,4 +23,6 @@ export class TaskLabelController {
     await this.labelService.delete(id);
     return { success: true };
   }
+
+
 }

@@ -269,4 +269,22 @@ export class TaskService {
       return new ResponseTaskDto(task);
     });
   }
+
+  async filterUserTasks(user: User, labelIds: number[]): Promise<ResponseTaskDto[]> {
+    const query = this.taskRepository
+      .createQueryBuilder('task')
+      .leftJoinAndSelect('task.labels', 'label')
+      .leftJoinAndSelect('task.project', 'project')
+      .leftJoinAndSelect('task.createdBy', 'createdBy')
+      .leftJoinAndSelect('task.assignedTo', 'assignedTo')
+      .leftJoinAndSelect('task.dependentTask', 'dependentTask')
+      .where('task.createdById = :userId OR task.assignedToId = :userId', { userId: user.id })
+
+    if (labelIds?.length > 0) {
+      query.andWhere('label.id IN (:...labelIds)', { labelIds })
+    }
+
+    const tasks = await query.getMany()
+    return plainToInstance(ResponseTaskDto, tasks)
+  }
 }

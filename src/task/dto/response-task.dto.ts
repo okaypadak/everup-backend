@@ -29,7 +29,7 @@ export class ResponseTaskDto {
   marketingStatus?: string;
 
   @Expose()
-  labelNames: string[];
+  labelIds: string[];
 
   constructor(task: any) {
     this.id = task.id;
@@ -41,6 +41,6 @@ export class ResponseTaskDto {
     this.createdAt = task.createdAt;
     this.deadline = task.deadline;
     this.marketingStatus = task.marketingStatus;
-    this.labelNames = task.labels?.map((l: any) => l.name) ?? [];
+    this.labelIds = task.labels?.map((l: any) => l.id) ?? [];
   }
 }

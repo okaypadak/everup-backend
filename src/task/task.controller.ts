@@ -83,4 +83,9 @@ export class TaskController {
     return this.taskService.filterByProjectAndLabels(projectId, labelIds);
   }
 
+  @Post('user/filter')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async filterUserTasks(@Req() req: any, @Body('labelIds') labelIds: number[]) {
+    return this.taskService.filterUserTasks(req.user, labelIds);
+  }
 }
