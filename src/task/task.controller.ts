@@ -67,7 +67,7 @@ export class TaskController {
     return this.taskService.findTaskDetailWithDependencies(id);
   }
 
-  @Delete('mine')
+  @Get('deleteAll')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async deleteMyTasks(@Req() req: any) {
     await this.taskService.deleteAllByUser(req.user);
