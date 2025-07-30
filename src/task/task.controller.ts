@@ -17,7 +17,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { TaskStatus } from './task.entity';
 
-@Controller('task')
+@Controller('tasks')
 @UseGuards(RolesGuard)
 export class TaskController {
   constructor(private readonly taskService: TaskService) {}
