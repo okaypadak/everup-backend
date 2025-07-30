@@ -1,8 +1,4 @@
-import { Exclude, Expose, Type } from 'class-transformer';
-import { User } from '../../user/user.entity';
-import { Task, TaskLevel, TaskStatus, TaskType } from '../task.entity';
-import { Project } from '../../project/project.entity';
-import { TaskDependency } from '../task-dependency.entity';
+import { Expose } from 'class-transformer';
 
 export class ResponseTaskDto {
   @Expose()
@@ -15,13 +11,13 @@ export class ResponseTaskDto {
   description: string;
 
   @Expose()
-  status: TaskStatus;
+  status: string;
 
   @Expose()
-  type: TaskType;
+  type: string;
 
   @Expose()
-  level: TaskLevel;
+  level: string;
 
   @Expose()
   createdAt: Date;
@@ -29,29 +25,22 @@ export class ResponseTaskDto {
   @Expose()
   deadline?: Date;
 
-  @Exclude()
-  @Type(() => User)
-  assignedTo: User;
+  @Expose()
+  marketingStatus?: string;
 
-  @Exclude()
-  @Type(() => User)
-  creator: User;
+  @Expose()
+  labelNames: string[];
 
-  @Exclude()
-  @Type(() => Project)
-  project: Project;
-
-  @Exclude()
-  @Type(() => TaskDependency)
-  dependencies?: TaskDependency[];
-
-  @Expose({ name: 'dependencyIds' })
-  get dependencyIds(): number[] {
-    if (!this.dependencies) return [];
-    return this.dependencies.map(dep => dep.dependsOn?.id).filter(Boolean);
-  }
-
-  constructor(partial: Partial<Task>) {
-    Object.assign(this, partial);
+  constructor(task: any) {
+    this.id = task.id;
+    this.title = task.title;
+    this.description = task.description;
+    this.status = task.status;
+    this.type = task.type;
+    this.level = task.level;
+    this.createdAt = task.createdAt;
+    this.deadline = task.deadline;
+    this.marketingStatus = task.marketingStatus;
+    this.labelNames = task.labels?.map((l: any) => l.name) ?? [];
   }
 }

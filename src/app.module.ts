@@ -36,7 +36,7 @@ console.log('--------------------------------');
       database: process.env.DB_NAME || 'everup',
       autoLoadEntities: true,
       synchronize: true,
-      dropSchema: false,
+      dropSchema: true,
       ssl: process.env.DB_SSL === 'true',
       extra: process.env.DB_SSL === 'true'
         ? {

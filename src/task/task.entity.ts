@@ -113,6 +113,16 @@ export class Task {
   customer: Customer;
 
   @ManyToMany(() => TaskLabel, { eager: true })
-  @JoinTable()
+  @JoinTable({
+    name: 'task_label_dependency',
+    joinColumn: {
+      name: 'taskId',
+      referencedColumnName: 'id',
+    },
+    inverseJoinColumn: {
+      name: 'labelId',
+      referencedColumnName: 'id',
+    },
+  })
   labels: TaskLabel[];
 }

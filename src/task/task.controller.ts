@@ -55,7 +55,7 @@ export class TaskController {
     return this.taskService.findAllByUserAndProject(projectId);
   }
 
-  @Get()
+  @Get('user')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async findAll(@Req() req: any): Promise<ResponseTaskDto[]> {
     return this.taskService.findAllByUser(req.user);
@@ -73,4 +73,14 @@ export class TaskController {
     await this.taskService.deleteAllByUser(req.user);
     return { success: true, message: 'Tüm kendi oluşturduğun tasklar silindi' };
   }
+
+  @Post('project/:projectId/filter')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async filterByProjectAndLabels(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Body('labelIds') labelIds: number[],
+  ) {
+    return this.taskService.filterByProjectAndLabels(projectId, labelIds);
+  }
+
 }

@@ -1,13 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Not, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Task, TaskLevel, TaskStatus, TaskType } from './task.entity';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { plainToInstance } from 'class-transformer';
-import { ForbiddenException } from '@nestjs/common';
 import { ResponseTaskDetailDto } from './dto/response-task-detail.dto';
 import { Comment } from '../comment/comment.entity';
 import { TaskDependency } from './task-dependency.entity';
@@ -38,9 +41,15 @@ export class TaskService {
 
     task.title = createTaskDto.title;
     task.description = createTaskDto.description;
-    task.assignedTo = await this.userRepository.findOneOrFail({ where: { id: createTaskDto.assignedTo } });
-    task.creator = await this.userRepository.findOneOrFail({ where: { id: user.id } });
-    task.project = await this.projectRepository.findOneOrFail({ where: { id: createTaskDto.project } });
+    task.assignedTo = await this.userRepository.findOneOrFail({
+      where: { id: createTaskDto.assignedTo },
+    });
+    task.creator = await this.userRepository.findOneOrFail({
+      where: { id: user.id },
+    });
+    task.project = await this.projectRepository.findOneOrFail({
+      where: { id: createTaskDto.project },
+    });
 
     task.type = createTaskDto.type ?? TaskType.TASK;
     task.level = createTaskDto.level ?? TaskLevel.NORMAL;
@@ -50,8 +59,10 @@ export class TaskService {
       task.deadline = new Date(createTaskDto.deadline);
     }
 
-    // ✅ Çoklu label desteği
-    if (Array.isArray(createTaskDto.labelIds) && createTaskDto.labelIds.length > 0) {
+    if (
+      Array.isArray(createTaskDto.labelIds) &&
+      createTaskDto.labelIds.length > 0
+    ) {
       const labels = await this.labelRepo.findBy({
         id: In(createTaskDto.labelIds),
       });
@@ -60,9 +71,11 @@ export class TaskService {
 
     const savedTask = await this.taskRepository.save(task);
 
-    // ➕ Bağımlı görevleri ekle (çoklu destek)
-    if (Array.isArray(createTaskDto.dependencyIds) && createTaskDto.dependencyIds.length > 0) {
-      const deps = createTaskDto.dependencyIds.map(depId => {
+    if (
+      Array.isArray(createTaskDto.dependencyIds) &&
+      createTaskDto.dependencyIds.length > 0
+    ) {
+      const deps = createTaskDto.dependencyIds.map((depId) => {
         const dep = new TaskDependency();
         dep.task = savedTask;
         dep.dependsOn = { id: depId } as Task;
@@ -71,7 +84,6 @@ export class TaskService {
 
       await this.taskDepRepo.save(deps);
 
-      // Bağımlıysa status WAITING yapılabilir
       savedTask.status = TaskStatus.WAITING;
       await this.taskRepository.save(savedTask);
     }
@@ -90,14 +102,13 @@ export class TaskService {
       where: { id },
       relations: ['dependencies', 'dependencies.dependsOn'],
     });
+
     if (!task) throw new NotFoundException('Görev bulunamadı');
 
     task.status = status;
     await this.taskRepository.save(task);
 
-    // 🧠 Sadece 'Completed' yapıldığında kontrol et
     if (status === TaskStatus.COMPLETED) {
-      // Bu göreve bağlı olan görevleri bul (yani kimler bu task'a bağımlı?)
       const dependents = await this.taskDepRepo.find({
         where: { dependsOn: { id: task.id } },
         relations: ['task', 'task.dependencies', 'task.dependencies.dependsOn'],
@@ -105,8 +116,9 @@ export class TaskService {
 
       for (const dep of dependents) {
         const dependentTask = dep.task;
-
-        const allDepsCompleted = dependentTask.dependencies.every(d => d.dependsOn.status === TaskStatus.COMPLETED);
+        const allDepsCompleted = dependentTask.dependencies.every(
+          (d) => d.dependsOn.status === TaskStatus.COMPLETED,
+        );
 
         if (allDepsCompleted && dependentTask.status === TaskStatus.WAITING) {
           dependentTask.status = TaskStatus.READY;
@@ -128,16 +140,19 @@ export class TaskService {
           TaskStatus.WAITING,
         ]),
       },
-      relations: ['project'],
+      relations: ['project', 'labels'],
       order: { createdAt: 'DESC' },
     });
 
-    return plainToInstance(ResponseTaskDto, tasks, {
-      excludeExtraneousValues: true,
+    return tasks.map((task) => {
+      return new ResponseTaskDto(task);
     });
   }
 
-  async findAllByUser(user: { id: number; role: string }): Promise<ResponseTaskDto[]> {
+  async findAllByUser(user: {
+    id: number;
+    role: string;
+  }): Promise<ResponseTaskDto[]> {
     const tasks = await this.taskRepository.find({
       where: { assignedTo: { id: user.id } },
       relations: [
@@ -146,27 +161,32 @@ export class TaskService {
         'project',
         'dependencies',
         'dependencies.dependsOn',
+        'labels',
       ],
       order: { createdAt: 'DESC' },
     });
 
-    return tasks.map(task => new ResponseTaskDto(task));
+    return tasks.map((task) => {
+      const dto = new ResponseTaskDto(task);
+      return dto;
+    });
   }
 
-  async findTaskDetailWithDependencies(taskId: number): Promise<ResponseTaskDetailDto> {
+  async findTaskDetailWithDependencies(
+    taskId: number,
+  ): Promise<ResponseTaskDetailDto> {
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
-      relations: ['assignedTo', 'creator', 'project'],
+      relations: ['assignedTo', 'creator', 'project', 'labels'],
     });
+
     if (!task) throw new NotFoundException('Görev bulunamadı');
 
-    // 🔁 Bağımlı olduğu görevler
     const deps = await this.taskDepRepo.find({
       where: { task: { id: taskId } },
       relations: ['dependsOn'],
     });
 
-    // 🧾 Görev yorumları
     const comments = await this.commentRepo.find({
       where: { task: { id: taskId } },
       order: { createdAt: 'ASC' },
@@ -184,18 +204,19 @@ export class TaskService {
       deadline: task.deadline,
       creator: `${task.creator.firstName} ${task.creator.lastName}`,
       project: task.project.name,
-      dependencies: deps.map(d => ({
+      dependencies: deps.map((d) => ({
         id: d.dependsOn.id,
         title: d.dependsOn.title,
         status: d.dependsOn.status,
       })),
-      comments: comments.map(comment => ({
+      comments: comments.map((comment) => ({
         id: comment.id,
         content: comment.content,
         createdAt: comment.createdAt,
         author: `${comment.author.firstName} ${comment.author.lastName}`,
         parentId: comment.parent?.id ?? null,
       })),
+      labels: task.labels?.map((label) => label.name) ?? [],
     };
 
     return plainToInstance(ResponseTaskDetailDto, response, {
@@ -209,12 +230,12 @@ export class TaskService {
       relations: ['creator'],
     });
 
-    if (!task) {
-      throw new NotFoundException('Task bulunamadı');
-    }
+    if (!task) throw new NotFoundException('Task bulunamadı');
 
-
-    if (task.creator.id !== user.id && !['admin', 'director'].includes(user.role)) {
+    if (
+      task.creator.id !== user.id &&
+      !['admin', 'director'].includes(user.role)
+    ) {
       throw new ForbiddenException('Bu taskı silme yetkiniz yok');
     }
 
@@ -227,10 +248,25 @@ export class TaskService {
       relations: ['creator'],
     });
 
-    if (tasks.length === 0) return;
-
-    await this.taskRepository.remove(tasks);
+    if (tasks.length > 0) {
+      await this.taskRepository.remove(tasks);
+    }
   }
 
+  async filterByProjectAndLabels(
+    projectId: number,
+    labelIds: number[],
+  ): Promise<ResponseTaskDto[]> {
+    const tasks = await this.taskRepository
+      .createQueryBuilder('task')
+      .leftJoinAndSelect('task.labels', 'label')
+      .leftJoinAndSelect('task.project', 'project')
+      .where('project.id = :projectId', { projectId })
+      .andWhere('label.id IN (:...labelIds)', { labelIds })
+      .getMany();
 
+    return tasks.map((task) => {
+      return new ResponseTaskDto(task);
+    });
+  }
 }
