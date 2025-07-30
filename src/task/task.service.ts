@@ -59,7 +59,7 @@ export class TaskService {
     const savedTask = await this.taskRepository.save(task);
 
     // ➕ Bağımlı görevleri ekle (çoklu destek)
-    if (createTaskDto.dependencyIds?.length > 0) {
+    if (createTaskDto.dependencyIds && createTaskDto.dependencyIds.length > 0) {
       const deps = createTaskDto.dependencyIds.map(depId => {
         const dep = new TaskDependency();
         dep.task = savedTask;
