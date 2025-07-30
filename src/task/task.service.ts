@@ -7,6 +7,7 @@ import { Project } from '../project/project.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { plainToInstance } from 'class-transformer';
+import { ForbiddenException } from '@nestjs/common';
 import { ResponseTaskDetailDto } from './dto/response-task-detail.dto';
 import { Comment } from '../comment/comment.entity';
 import { TaskDependency } from './task-dependency.entity';
@@ -65,6 +66,12 @@ export class TaskService {
     }
 
     return savedTask;
+  }
+
+  async createMany(dtos: CreateTaskDto[], user: User) {
+    for (const dto of dtos) {
+      await this.create(dto, user);
+    }
   }
 
   async updateStatus(id: number, status: TaskStatus): Promise<Task> {
@@ -184,4 +191,17 @@ export class TaskService {
       excludeExtraneousValues: true,
     });
   }
+
+  async delete(id: number, user: User): Promise<void> {
+    const task = await this.taskRepository.findOne({ where: { id }, relations: ['createdBy'] });
+    if (!task) throw new NotFoundException('Task bulunamadı');
+
+    // sadece task sahibi veya yetkili roller silebilsin
+    if (task.createdBy.id !== user.id && !['admin', 'director'].includes(user.role)) {
+      throw new ForbiddenException('Bu taskı silme yetkiniz yok');
+    }
+
+    await this.taskRepository.remove(task);
+  }
+
 }
