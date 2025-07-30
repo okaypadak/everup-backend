@@ -7,9 +7,11 @@ import { Project } from '../project/project.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { plainToInstance } from 'class-transformer';
+import { ForbiddenException } from '@nestjs/common';
 import { ResponseTaskDetailDto } from './dto/response-task-detail.dto';
 import { Comment } from '../comment/comment.entity';
 import { TaskDependency } from './task-dependency.entity';
+import { TaskLabel } from './task-label.entity';
 
 @Injectable()
 export class TaskService {
@@ -24,6 +26,8 @@ export class TaskService {
     private readonly commentRepo: Repository<Comment>,
     @InjectRepository(TaskDependency)
     private readonly taskDepRepo: Repository<TaskDependency>,
+    @InjectRepository(TaskLabel)
+    private readonly labelRepo: Repository<TaskLabel>,
   ) {}
 
   async create(
@@ -46,10 +50,18 @@ export class TaskService {
       task.deadline = new Date(createTaskDto.deadline);
     }
 
+    // ✅ Çoklu label desteği
+    if (Array.isArray(createTaskDto.labelIds) && createTaskDto.labelIds.length > 0) {
+      const labels = await this.labelRepo.findBy({
+        id: In(createTaskDto.labelIds),
+      });
+      task.labels = labels;
+    }
+
     const savedTask = await this.taskRepository.save(task);
 
     // ➕ Bağımlı görevleri ekle (çoklu destek)
-    if (createTaskDto.dependencyIds && createTaskDto.dependencyIds.length > 0) {
+    if (Array.isArray(createTaskDto.dependencyIds) && createTaskDto.dependencyIds.length > 0) {
       const deps = createTaskDto.dependencyIds.map(depId => {
         const dep = new TaskDependency();
         dep.task = savedTask;
@@ -65,6 +77,12 @@ export class TaskService {
     }
 
     return savedTask;
+  }
+
+  async createMany(dtos: CreateTaskDto[], user: User) {
+    for (const dto of dtos) {
+      await this.create(dto, user);
+    }
   }
 
   async updateStatus(id: number, status: TaskStatus): Promise<Task> {
@@ -184,4 +202,35 @@ export class TaskService {
       excludeExtraneousValues: true,
     });
   }
+
+  async delete(id: number, user: User): Promise<void> {
+    const task = await this.taskRepository.findOne({
+      where: { id },
+      relations: ['creator'],
+    });
+
+    if (!task) {
+      throw new NotFoundException('Task bulunamadı');
+    }
+
+
+    if (task.creator.id !== user.id && !['admin', 'director'].includes(user.role)) {
+      throw new ForbiddenException('Bu taskı silme yetkiniz yok');
+    }
+
+    await this.taskRepository.remove(task);
+  }
+
+  async deleteAllByUser(user: User): Promise<void> {
+    const tasks = await this.taskRepository.find({
+      where: { creator: { id: user.id } },
+      relations: ['creator'],
+    });
+
+    if (tasks.length === 0) return;
+
+    await this.taskRepository.remove(tasks);
+  }
+
+
 }

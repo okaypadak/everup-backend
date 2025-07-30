@@ -11,6 +11,7 @@ import { ProjectModule } from './project/project.module';
 import { CustomerModule } from './customer/customer.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { DocumentModule } from './document/document.module';
+import { TaskLabelModule } from './task/task-label.module';
 
 console.log('✅ ENV VALUES ------------------');
 console.log('DB_HOST:', process.env.DB_HOST);
@@ -49,6 +50,7 @@ console.log('--------------------------------');
     UserModule,
     AuthModule,
     TaskModule,
+    TaskLabelModule,
     ProjectModule,
     CommentModule,
     NotificationModule,

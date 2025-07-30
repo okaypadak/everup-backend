@@ -6,12 +6,15 @@ import {
   CreateDateColumn,
   JoinColumn,
   OneToMany,
+  ManyToMany,
   OneToOne,
+  JoinTable,
 } from 'typeorm';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
 import { TaskDependency } from './task-dependency.entity';
 import { Customer } from '../customer/customer.entity';
+import { TaskLabel } from './task-label.entity';
 
 export enum TaskType {
   TASK = 'task',
@@ -92,7 +95,7 @@ export class Task {
   @Column({
     type: 'enum',
     enum: MarketingTaskStatus,
-    default: MarketingTaskStatus.NEW_LEAD,
+    nullable: true,
   })
   marketingStatus: MarketingTaskStatus;
 
@@ -108,4 +111,8 @@ export class Task {
   @OneToOne(() => Customer, (customer) => customer.task)
   @JoinColumn()
   customer: Customer;
+
+  @ManyToMany(() => TaskLabel, { eager: true })
+  @JoinTable()
+  labels: TaskLabel[];
 }

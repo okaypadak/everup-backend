@@ -6,7 +6,9 @@ import {
   Param,
   ParseIntPipe,
   Req,
-  UseGuards, Patch,
+  UseGuards,
+  Patch,
+  Delete,
 } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -24,29 +26,38 @@ export class TaskController {
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async create(@Req() req: any, @Body() createTaskDto: CreateTaskDto) {
     await this.taskService.create(createTaskDto, req.user);
-    return { success: true, message: 'İşlem başarılı' };
+    return { success: true, message: 'Tekli task başarıyla oluşturuldu' };
+  }
+
+  @Post('bulk')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async createBulk(@Req() req: any, @Body() taskList: CreateTaskDto[]) {
+    await this.taskService.createMany(taskList, req.user);
+    return { success: true, message: 'Çoklu task başarıyla oluşturuldu' };
   }
 
   @Patch(':id/status')
   @Roles('admin', 'director', 'developer')
   async updateStatus(@Param('id') id: number, @Body('status') status: TaskStatus) {
-    return this.taskService.updateStatus(id, status)
+    return this.taskService.updateStatus(id, status);
+  }
+
+  @Delete(':id')
+  @Roles('admin', 'director', 'developer')
+  async deleteTask(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    await this.taskService.delete(id, req.user);
+    return { success: true, message: 'Task silindi' };
   }
 
   @Get('project/:projectId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  async findAllByProject(
-    @Param('projectId') projectId: number,
-    @Req() req: any
-  ): Promise<ResponseTaskDto[]> {
-    return this.taskService.findAllByUserAndProject(Number(projectId));
+  async findAllByProject(@Param('projectId') projectId: number): Promise<ResponseTaskDto[]> {
+    return this.taskService.findAllByUserAndProject(projectId);
   }
 
   @Get()
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  async findAll(
-    @Req() req: any
-  ): Promise<ResponseTaskDto[]> {
+  async findAll(@Req() req: any): Promise<ResponseTaskDto[]> {
     return this.taskService.findAllByUser(req.user);
   }
 
@@ -54,5 +65,12 @@ export class TaskController {
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async getTaskDetail(@Param('id', ParseIntPipe) id: number) {
     return this.taskService.findTaskDetailWithDependencies(id);
+  }
+
+  @Get('deleteAll')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async deleteMyTasks(@Req() req: any) {
+    await this.taskService.deleteAllByUser(req.user);
+    return { success: true, message: 'Tüm kendi oluşturduğun tasklar silindi' };
   }
 }
