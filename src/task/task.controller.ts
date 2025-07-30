@@ -55,7 +55,7 @@ export class TaskController {
     return this.taskService.findAllByUserAndProject(projectId);
   }
 
-  @Get()
+  @Get('all')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async findAll(@Req() req: any): Promise<ResponseTaskDto[]> {
     return this.taskService.findAllByUser(req.user);
