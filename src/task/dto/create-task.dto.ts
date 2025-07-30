@@ -40,6 +40,11 @@ export class CreateTaskDto {
 
   @IsOptional()
   @IsArray()
+  @IsNumber({}, { each: true })
+  labelIds?: number[];
+
+  @IsOptional()
+  @IsArray()
   @ArrayUnique()
   @IsNumber({}, { each: true })
   dependencyIds?: number[];

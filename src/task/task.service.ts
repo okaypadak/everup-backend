@@ -11,6 +11,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { ResponseTaskDetailDto } from './dto/response-task-detail.dto';
 import { Comment } from '../comment/comment.entity';
 import { TaskDependency } from './task-dependency.entity';
+import { TaskLabel } from './task-label.entity';
 
 @Injectable()
 export class TaskService {
@@ -25,6 +26,8 @@ export class TaskService {
     private readonly commentRepo: Repository<Comment>,
     @InjectRepository(TaskDependency)
     private readonly taskDepRepo: Repository<TaskDependency>,
+    @InjectRepository(TaskLabel)
+    private readonly labelRepo: Repository<TaskLabel>,
   ) {}
 
   async create(
@@ -47,10 +50,16 @@ export class TaskService {
       task.deadline = new Date(createTaskDto.deadline);
     }
 
+    // ✅ Çoklu label desteği
+    if (createTaskDto.labelIds?.length > 0) {
+      const labels = await this.labelRepo.findBy({ id: In(createTaskDto.labelIds) });
+      task.labels = labels;
+    }
+
     const savedTask = await this.taskRepository.save(task);
 
     // ➕ Bağımlı görevleri ekle (çoklu destek)
-    if (createTaskDto.dependencyIds && createTaskDto.dependencyIds.length > 0) {
+    if (createTaskDto.dependencyIds?.length > 0) {
       const deps = createTaskDto.dependencyIds.map(depId => {
         const dep = new TaskDependency();
         dep.task = savedTask;
