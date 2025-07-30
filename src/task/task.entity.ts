@@ -92,7 +92,7 @@ export class Task {
   @Column({
     type: 'enum',
     enum: MarketingTaskStatus,
-    default: MarketingTaskStatus.NEW_LEAD,
+    nullable: true,
   })
   marketingStatus: MarketingTaskStatus;
 

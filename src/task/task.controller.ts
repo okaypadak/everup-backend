@@ -55,7 +55,6 @@ export class TaskController {
     return this.taskService.findAllByUserAndProject(projectId);
   }
 
-  @Get()
   @Get('all')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async findAll(@Req() req: any): Promise<ResponseTaskDto[]> {
@@ -66,5 +65,12 @@ export class TaskController {
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async getTaskDetail(@Param('id', ParseIntPipe) id: number) {
     return this.taskService.findTaskDetailWithDependencies(id);
+  }
+
+  @Delete('mine')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async deleteMyTasks(@Req() req: any) {
+    await this.taskService.deleteAllByUser(req.user);
+    return { success: true, message: 'Tüm kendi oluşturduğun tasklar silindi' };
   }
 }

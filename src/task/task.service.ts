@@ -202,12 +202,24 @@ export class TaskService {
       throw new NotFoundException('Task bulunamadı');
     }
 
-    // sadece creator veya admin/director silebilsin
+
     if (task.creator.id !== user.id && !['admin', 'director'].includes(user.role)) {
       throw new ForbiddenException('Bu taskı silme yetkiniz yok');
     }
 
     await this.taskRepository.remove(task);
   }
+
+  async deleteAllByUser(user: User): Promise<void> {
+    const tasks = await this.taskRepository.find({
+      where: { creator: { id: user.id } },
+      relations: ['creator'],
+    });
+
+    if (tasks.length === 0) return;
+
+    await this.taskRepository.remove(tasks);
+  }
+
 
 }
