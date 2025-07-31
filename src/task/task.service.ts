@@ -270,7 +270,7 @@ export class TaskService {
     });
   }
 
-  async filterUserTasks(user: User, labelIds: number[]): Promise<ResponseTaskDto[]> {
+  async filterLabelsTasks(user: User, labelIds: number[]): Promise<ResponseTaskDto[]> {
     const query = this.taskRepository
       .createQueryBuilder('task')
       .leftJoinAndSelect('task.labels', 'label')
@@ -286,5 +286,24 @@ export class TaskService {
 
     const tasks = await query.getMany()
     return plainToInstance(ResponseTaskDto, tasks)
+  }
+
+  async findTasksCreatedByUser(user: User): Promise<ResponseTaskDto[]> {
+    const tasks = await this.taskRepository.find({
+      where: { creator: { id: user.id } },
+      relations: [
+        'assignedTo',
+        'creator',
+        'project',
+        'dependencies',
+        'dependencies.dependsOn',
+        'labels',
+      ],
+      order: { createdAt: 'DESC' },
+    });
+
+    return tasks.map((task) => {
+      return new ResponseTaskDto(task);
+    });
   }
 }
