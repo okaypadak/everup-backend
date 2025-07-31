@@ -8,14 +8,12 @@ export class TaskLabelController {
 
   @Post(':projectId')
   async create(@Param('projectId', ParseIntPipe) projectId: number, @Body('name') name: string) {
-    const label = await this.labelService.create(projectId, name);
-    return { success: true, label };
+    return await this.labelService.create(projectId, name);
   }
 
   @Get(':projectId')
   async getByProject(@Param('projectId', ParseIntPipe) projectId: number) {
-    const labels = await this.labelService.findByProject(projectId);
-    return { success: true, labels };
+    return await this.labelService.findByProject(projectId);
   }
 
   @Delete(':id')

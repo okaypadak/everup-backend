@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ProjectDocument } from './document.schema';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
 
 @Injectable()
 export class DocumentService {
@@ -12,6 +13,12 @@ export class DocumentService {
 
   async findByProject(projectId: string): Promise<ProjectDocument[]> {
     return this.docModel.find({ projectId }).lean();
+  }
+
+  async findById(id: string): Promise<ProjectDocument> {
+    const doc = await this.docModel.findById(id);
+    if (!doc) throw new NotFoundException('Document not found');
+    return doc;
   }
 
   async create(dto: CreateDocumentDto): Promise<ProjectDocument> {
@@ -33,5 +40,18 @@ export class DocumentService {
       ids = ids.concat(this.collectNestedIds(docs, childId));
     }
     return ids;
+  }
+
+  async updateById(id: string, update: Partial<UpdateDocumentDto>): Promise<ProjectDocument> {
+    const updatedDoc = await this.docModel.findByIdAndUpdate(id, update, {
+      new: true,              // güncel belgeyi döndür
+      runValidators: true,    // schema validation çalışsın
+    });
+
+    if (!updatedDoc) {
+      throw new NotFoundException('Document not found');
+    }
+
+    return updatedDoc;
   }
 }

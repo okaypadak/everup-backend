@@ -1,28 +1,21 @@
-import { Expose, Transform } from 'class-transformer';
-
 export class ResponseDocumentDto {
-  @Transform(({ obj }) => obj._id.toString())
-  @Expose()
-  _id: string;
-
-  @Expose()
+  id: string;
   projectId: string;
-
-  @Expose()
   parentId?: string | null;
-
-  @Expose()
   title: string;
-
-  @Expose()
   desc?: string;
-
-  @Expose()
   content?: string;
-
-  @Expose()
   createdAt: Date;
-
-  @Expose()
   updatedAt: Date;
+
+  constructor(doc: any) {
+    this.id = doc._id?.toString?.() ?? '';
+    this.projectId = doc.projectId;
+    this.parentId = doc.parentId;
+    this.title = doc.title;
+    this.desc = doc.desc;
+    this.content = doc.content;
+    this.createdAt = doc.createdAt;
+    this.updatedAt = doc.updatedAt;
+  }
 }
