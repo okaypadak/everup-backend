@@ -8,6 +8,7 @@ import { Comment } from './comment.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { Task } from '../task/task.entity';
 import { User } from '../user/user.entity';
+import { ResponseCommentDto } from './dto/response-comment.dto';
 
 @Injectable()
 export class CommentService {
@@ -18,13 +19,7 @@ export class CommentService {
     private readonly taskRepo: Repository<Task>,
   ) {}
 
-  async findAllByTask(taskId: number): Promise<Comment[]> {
-    return this.commentRepo.find({
-      where: { task: { id: taskId } },
-      order: { createdAt: 'ASC' },
-      relations: ['author', 'parent'],
-    });
-  }
+
 
   async createComment(dto: CreateCommentDto, author: User): Promise<Comment> {
     const task = await this.taskRepo.findOne({
@@ -54,5 +49,26 @@ export class CommentService {
     }
 
     return this.commentRepo.save(comment);
+  }
+
+  async findAllByTask(taskId: number): Promise<ResponseCommentDto[]> {
+    const comments = await this.commentRepo.find({
+      where: { task: { id: taskId } },
+      order: { createdAt: 'ASC' },
+      relations: ['author', 'task'],
+    });
+
+    return comments.map(comment => new ResponseCommentDto(comment));
+  }
+
+  async findLatestByUser(userId: number): Promise<ResponseCommentDto[]> {
+    const comments = await this.commentRepo.find({
+      where: { author: { id: userId } },
+      order: { createdAt: 'DESC' },
+      take: 20,
+      relations: ['author', 'task'],
+    });
+
+    return comments.map(comment => new ResponseCommentDto(comment));
   }
 }

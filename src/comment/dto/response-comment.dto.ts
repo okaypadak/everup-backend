@@ -1,18 +1,15 @@
-import { Expose, Type } from 'class-transformer';
-
-export class CommentAuthorDto {
-  @Expose() id: number;
-  @Expose() firstName: string;
-  @Expose() lastName: string;
-  @Expose() role: string;
-}
-
 export class ResponseCommentDto {
-  @Expose() id: number;
-  @Expose() content: string;
-  @Expose() createdAt: Date;
+  id: number;
+  text: string;
+  createdAt: Date;
+  authorName: string;
+  taskTitle: string;
 
-  @Expose()
-  @Type(() => CommentAuthorDto)
-  author: CommentAuthorDto;
+  constructor(comment: Comment) {
+    this.id = comment.id;
+    this.text = comment.content;
+    this.createdAt = comment.createdAt;
+    this.authorName = comment.author?.name;
+    this.taskTitle = comment.task?.title;
+  }
 }

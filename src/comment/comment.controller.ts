@@ -12,20 +12,32 @@ import { RolesGuard } from '../auth/roles.guard';
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 
-  // Bir task'ın tüm yorumları
   @Get('/task/:taskId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async getByTask(@Param('taskId') taskId: number): Promise<ResponseCommentDto[]> {
     return this.commentService.findAllByTask(Number(taskId));
   }
 
+  @Get('/me')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async getMyComments(@Req() req: any): Promise<ResponseCommentDto[]> {
+    return this.commentService.findLatestByUser(req.user.id);
+  }
+
   @Post()
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async createComment(@Body() dto: CreateCommentDto, @Req() req: any) {
-    const savedComment = await this.commentService.createComment(dto, req.user.id);
-    return {
-      statusCode: 200,
-      message: 'Yorum eklendi.'
-    };
+    try {
+      await this.commentService.createComment(dto, req.user.id);
+      return {
+        statusCode: 200,
+        message: 'Yorum başarıyla eklendi.',
+      };
+    } catch (error) {
+      return {
+        statusCode: 400,
+        message: error.message || 'Yorum eklenirken bir hata oluştu.',
+      };
+    }
   }
 }
