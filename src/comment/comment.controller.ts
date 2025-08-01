@@ -14,11 +14,11 @@ export class CommentController {
 
   @Get('/task/:taskId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  async getByTask(@Param('taskId') taskId: number): Promise<ResponseCommentDto[]> {
+  async getByTask(@Param('taskId') taskId:   number): Promise<ResponseCommentDto[]> {
     return this.commentService.findAllByTask(Number(taskId));
   }
 
-  @Get('/me')
+  @Get('/mine')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async getMyComments(@Req() req: any): Promise<ResponseCommentDto[]> {
     return this.commentService.findLatestByUser(req.user.id);

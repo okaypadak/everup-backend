@@ -1,19 +1,24 @@
-import { Entity, PrimaryGeneratedColumn, ManyToOne, Column, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  ManyToOne,
+  Column,
+  CreateDateColumn,
+  JoinColumn,
+} from 'typeorm';
 import { User } from '../user/user.entity';
 import { Task } from '../task/task.entity';
 
-@Entity()
+@Entity('notifications')
 export class Notification {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, { eager: true })
+  @ManyToOne(() => User, { eager: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne(() => Task, { eager: true })
-  task: Task;
-
-  @Column()
+  @Column({ type: 'text' })
   message: string;
 
   @Column({ default: false })

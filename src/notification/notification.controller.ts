@@ -8,10 +8,10 @@ import { ClassSerializerInterceptor } from '@nestjs/common';
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
-  // Kullanıcıya özel bildirimler
   @Get('mine')
   async myNotifications(@Req() req): Promise<ResponseNotificationDto[]> {
-    return this.notificationService.findNotificationsForUser(req.user);
+    const notifs = await this.notificationService.findNotificationsForUser(req.user);
+    return notifs.map(n => new ResponseNotificationDto(n));
   }
 
   // Bildirimi okundu olarak işaretle
