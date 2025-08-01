@@ -1,3 +1,4 @@
+// src/comment/dto/response-comment.dto.ts
 import { Comment } from '../comment.entity';
 
 export class ResponseCommentDto {
