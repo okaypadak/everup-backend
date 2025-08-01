@@ -27,9 +27,7 @@ export class NotificationInterceptor implements NestInterceptor {
             if (task.assignedTo.id !== creator?.id) {
               await this.notificationService.createNotification({
                 user: task.assignedTo,
-                task,
                 message: `${creator?.firstName ?? 'Birisi'}, sana "${task.title}" adında bir görev atadı.`,
-                type: 'ASSIGNMENT',
               });
             }
           }

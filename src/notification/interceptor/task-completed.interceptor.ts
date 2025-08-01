@@ -7,7 +7,6 @@ import {
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { NotificationService } from '../notification.service';
-import { NotificationType } from '../notification.entity';
 import { TaskDependency } from '../../task/task-dependency.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -25,7 +24,9 @@ export class TaskCompletedInterceptor implements NestInterceptor {
       tap(async (result) => {
         if (result?.status === 'completed' && result?.id) {
           const dependents = await this.dependencyRepo.find({
-            where: { dependencyId: result.id },
+            where: {
+              dependency: { id: result.id },
+            } as any, // TS hatasını önlemek için
             relations: ['task', 'task.assignedTo'],
           });
 
@@ -33,9 +34,8 @@ export class TaskCompletedInterceptor implements NestInterceptor {
             if (dependent.task?.assignedTo) {
               await this.notificationService.createNotification({
                 user: dependent.task.assignedTo,
-                task: dependent.task,
                 message: `Bağlı olduğun görev "${result.title}" tamamlandı.`,
-                type: NotificationType.TASK_DEPENDENCY_READY,
+                // type: NotificationType.TASK_DEPENDENCY_READY, <-- KULLANILMIYOR
               });
             }
           }
@@ -44,3 +44,4 @@ export class TaskCompletedInterceptor implements NestInterceptor {
     );
   }
 }
+

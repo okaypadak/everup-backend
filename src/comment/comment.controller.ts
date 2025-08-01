@@ -14,7 +14,7 @@ export class CommentController {
 
   @Get('/task/:taskId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  async getByTask(@Param('taskId') taskId: number): Promise<ResponseCommentDto[]> {
+  async getByTask(@Param('taskId') taskId:   number): Promise<ResponseCommentDto[]> {
     return this.commentService.findAllByTask(Number(taskId));
   }
 

@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { Task } from '../task/task.entity';
+import { Task, TaskStatus } from '../task/task.entity';
 import { Repository, Between } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { NotificationService } from './notification.service';
-import { NotificationType } from './notification.entity';
+import { NotificationService } from '../notification/notification.service';
 import * as dayjs from 'dayjs';
-
+import { Not } from 'typeorm';
 @Injectable()
 export class NotificationScheduler {
   constructor(
@@ -23,7 +22,7 @@ export class NotificationScheduler {
     const tasks = await this.taskRepo.find({
       where: {
         deadline: Between(now.toDate(), tomorrow.toDate()),
-        status: Not('completed'),
+        status: Not(TaskStatus.COMPLETED),
       },
       relations: ['assignedTo'],
     });
@@ -32,9 +31,7 @@ export class NotificationScheduler {
       if (task.assignedTo) {
         await this.notificationService.createNotification({
           user: task.assignedTo,
-          task,
           message: `Görev "${task.title}" için son teslim tarihi yaklaşıyor.`,
-          type: NotificationType.DEADLINE_REMINDER,
         });
       }
     }

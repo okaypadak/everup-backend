@@ -27,9 +27,7 @@ export class CommentNewInterceptor implements NestInterceptor {
             if (task.assignedTo && task.assignedTo.id !== author.id) {
               await this.notificationService.createNotification({
                 user: task.assignedTo,
-                task,
                 message: `Task "${task.title}" için yeni yorum: "${result.content.slice(0, 40)}..."`,
-                type: 'COMMENT',
               });
             }
           }
