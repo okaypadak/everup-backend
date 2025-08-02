@@ -8,11 +8,22 @@ import { Project } from '../project/project.entity';
 import { Comment } from '../comment/comment.entity';
 import { TaskDependency } from './task-dependency.entity';
 import { TaskLabel } from './task-label.entity';
+import { NotificationModule } from '../notification/notification.module'; // ✅ EKLENDİ
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Task, TaskLabel, User, Project, Comment, TaskDependency])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Task,
+      TaskLabel,
+      User,
+      Project,
+      Comment,
+      TaskDependency,
+    ]),
+    NotificationModule,
+  ],
   providers: [TaskService],
   controllers: [TaskController],
-  exports: [TaskService]
+  exports: [TaskService],
 })
 export class TaskModule {}

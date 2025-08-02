@@ -36,10 +36,23 @@ export class NotificationService {
     user: User;
     message: string;
   }) {
-    const notif = this.notificationRepo.create({
-      user: params.user,
-      message: params.message,
-    });
-    return this.notificationRepo.save(notif);
+    try {
+      console.log('[NotificationService] createNotification started');
+      console.log('  User ID:', params.user?.id);
+      console.log('  Message:', params.message);
+
+      const notif = this.notificationRepo.create({
+        user: params.user,
+        message: params.message,
+      });
+
+      const saved = await this.notificationRepo.save(notif);
+
+      console.log('[NotificationService] Notification saved with ID:', saved.id);
+      return saved;
+    } catch (error) {
+      console.error('[NotificationService] HATA:', error);
+      throw error; // isteğe bağlı, istersen swallow edebilirsin
+    }
   }
 }

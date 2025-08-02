@@ -22,20 +22,31 @@ export class TaskCompletedInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
       tap(async (result) => {
-        if (result?.status === 'completed' && result?.id) {
+        console.log('[TaskCompletedInterceptor] Interceptor triggered for task:', result?.id);
+
+        if (result?.status === 'Completed' && result?.id) {
+          console.log('[TaskCompletedInterceptor] Task marked as completed:', result.title);
+
           const dependents = await this.dependencyRepo.find({
             where: {
-              dependency: { id: result.id },
-            } as any, // TS hatasını önlemek için
+              dependsOn: { id: result.id },
+            } as any,
             relations: ['task', 'task.assignedTo'],
           });
 
+          if (!dependents || dependents.length === 0) {
+            console.log('[TaskCompletedInterceptor] No dependent tasks found. Skipping notification.');
+            return;
+          }
+
+          console.log(`[TaskCompletedInterceptor] Found ${dependents.length} dependent tasks.`);
+
           for (const dependent of dependents) {
             if (dependent.task?.assignedTo) {
+              console.log(`[TaskCompletedInterceptor] Notifying user ID ${dependent.task.assignedTo.id}`);
               await this.notificationService.createNotification({
                 user: dependent.task.assignedTo,
                 message: `Bağlı olduğun görev "${result.title}" tamamlandı.`,
-                // type: NotificationType.TASK_DEPENDENCY_READY, <-- KULLANILMIYOR
               });
             }
           }
@@ -44,4 +55,3 @@ export class TaskCompletedInterceptor implements NestInterceptor {
     );
   }
 }
-

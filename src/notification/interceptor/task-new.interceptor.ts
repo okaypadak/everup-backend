@@ -11,7 +11,7 @@ import { Task } from '../../task/task.entity';
 import { User } from '../../user/user.entity';
 
 @Injectable()
-export class NotificationInterceptor implements NestInterceptor {
+export class CreateTaskNotificationInterceptor implements NestInterceptor {
   constructor(private readonly notificationService: NotificationService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
