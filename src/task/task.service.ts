@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
 import { Task, TaskLevel, TaskStatus, TaskType } from './task.entity';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
@@ -275,22 +275,26 @@ export class TaskService {
       .createQueryBuilder('task')
       .leftJoinAndSelect('task.labels', 'label')
       .leftJoinAndSelect('task.project', 'project')
-      .leftJoinAndSelect('task.createdBy', 'createdBy')
+      .leftJoinAndSelect('task.creator', 'creator')
       .leftJoinAndSelect('task.assignedTo', 'assignedTo')
-      .leftJoinAndSelect('task.dependentTask', 'dependentTask')
-      .where('task.createdById = :userId OR task.assignedToId = :userId', { userId: user.id })
+      .leftJoinAndSelect('task.dependencies', 'dependencies')
+      .leftJoinAndSelect('dependencies.dependsOn', 'dependsOn')
+      .where('task.creatorId = :userId OR task.assignedToId = :userId', { userId: user.id });
 
     if (labelIds?.length > 0) {
-      query.andWhere('label.id IN (:...labelIds)', { labelIds })
+      query.andWhere('label.id IN (:...labelIds)', { labelIds });
     }
 
-    const tasks = await query.getMany()
-    return plainToInstance(ResponseTaskDto, tasks)
+    const tasks = await query.getMany();
+    return plainToInstance(ResponseTaskDto, tasks);
   }
 
   async findTasksCreatedByUser(user: User): Promise<ResponseTaskDto[]> {
     const tasks = await this.taskRepository.find({
-      where: { creator: { id: user.id } },
+      where: {
+        creator: { id: user.id },
+        assignedTo: { id: Not(user.id) },
+      },
       relations: [
         'assignedTo',
         'creator',
@@ -302,8 +306,6 @@ export class TaskService {
       order: { createdAt: 'DESC' },
     });
 
-    return tasks.map((task) => {
-      return new ResponseTaskDto(task);
-    });
+    return tasks.map(task => new ResponseTaskDto(task));
   }
 }

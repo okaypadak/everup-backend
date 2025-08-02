@@ -16,7 +16,6 @@ export class NotificationService {
     return this.notificationRepo.find({
       where: { user: { id: user.id } },
       order: { createdAt: 'DESC' },
-      relations: ['task'],
       take: 50,
     });
   }

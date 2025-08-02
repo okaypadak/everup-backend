@@ -29,18 +29,20 @@ export class ResponseTaskDto {
   marketingStatus?: string;
 
   @Expose()
-  labelIds: string[];
+  labelIds: number[];
 
   constructor(task: any) {
-    this.id = task.id;
-    this.title = task.title;
-    this.description = task.description;
-    this.status = task.status;
-    this.type = task.type;
-    this.level = task.level;
-    this.createdAt = task.createdAt;
-    this.deadline = task.deadline;
-    this.marketingStatus = task.marketingStatus;
-    this.labelIds = task.labels?.map((l: any) => l.id) ?? [];
+    this.id = task?.id ?? null;
+    this.title = task?.title ?? '';
+    this.description = task?.description ?? '';
+    this.status = task?.status ?? '';
+    this.type = task?.type ?? '';
+    this.level = task?.level ?? '';
+    this.createdAt = task?.createdAt ?? new Date();
+    this.deadline = task?.deadline ?? null;
+    this.marketingStatus = task?.marketingStatus ?? null;
+    this.labelIds = Array.isArray(task?.labels)
+      ? task.labels.map((l: any) => l?.id).filter((id: any) => id != null)
+      : [];
   }
 }
