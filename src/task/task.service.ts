@@ -138,6 +138,7 @@ export class TaskService {
           TaskStatus.READY,
           TaskStatus.IN_PROGRESS,
           TaskStatus.WAITING,
+          TaskStatus.COMPLETED,
         ]),
       },
       relations: ['project', 'labels'],
