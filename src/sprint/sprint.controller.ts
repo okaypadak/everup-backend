@@ -18,6 +18,7 @@ import { ResponseSprintTaskDto } from './dto/response-sprint-task.dto'
 import { ResponseSprintSummaryDto } from './dto/response-sprint-summary.dto'
 import { Roles } from '../auth/roles.decorator'
 import { RolesGuard } from '../auth/roles.guard'
+import { plainToInstance } from 'class-transformer'
 
 @Controller('sprints')
 @UseGuards(RolesGuard)
@@ -78,6 +79,9 @@ export class SprintController {
 
     return new ResponseSprintSummaryDto({
       sprint: new ResponseSprintDto(res.sprint),
+      tasks: plainToInstance(ResponseSprintTaskDto, res.tasks, {
+        excludeExtraneousValues: true,   // 👈 sadece @Expose alanları kalsın
+      }),
       stats: res.stats,
       remainingDays: res.remainingDays,
       today: res.today,

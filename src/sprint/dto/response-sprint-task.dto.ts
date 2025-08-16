@@ -5,10 +5,10 @@ export class ResponseSprintTaskDto {
   @Expose() id: number
   @Expose() title: string
 
-  // ham status (ör: 'completed' | 'in_progress' | 'pending' ...)
+  // Orijinal status
   @Expose() status?: string
 
-  // Vue tarafında Türkçe label kullanmak istersen:
+  // Frontend için Türkçe label
   @Expose()
   @Transform(({ obj }: { obj: Task }) => {
     const s = (obj.status || '').toLowerCase()
