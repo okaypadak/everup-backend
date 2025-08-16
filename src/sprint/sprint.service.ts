@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { Sprint } from './sprint.entity'
 import { Project } from '../project/project.entity'
 import { Task } from '../task/task.entity'
@@ -19,7 +19,6 @@ export class SprintService {
 
   private ymd(d: Date | string) {
     const dt = typeof d === 'string' ? new Date(d) : d
-    // UTC normalize -> YYYY-MM-DD
     const z = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()))
     return z.toISOString().slice(0, 10)
   }
@@ -40,6 +39,17 @@ export class SprintService {
     if (['completed', 'done', 'tamamlandı'].includes(v)) return 'completed'
     if (['in_progress', 'doing', 'devam'].includes(v)) return 'in_progress'
     return 'pending'
+  }
+
+  /** Aktif sprinti bulur; yoksa null döner (404 atmaz) */
+  private async findActiveSprintOrNull(projectId: number) {
+    const today = this.ymd(new Date())
+    return this.sprintRepo
+      .createQueryBuilder('s')
+      .where('s.projectId = :projectId', { projectId })
+      .andWhere('s.startDate <= :today AND s.endDate >= :today', { today })
+      .orderBy('s.startDate', 'DESC')
+      .getOne()
   }
 
   /* ----------------------------- CRUD/Basic ----------------------------- */
@@ -121,12 +131,13 @@ export class SprintService {
     const project = await this.projectRepo.findOne({ where: { id: projectId } })
     if (!project) throw new NotFoundException('Proje bulunamadı')
 
-    return this.taskRepo.createQueryBuilder('t')
+    return this.taskRepo
+      .createQueryBuilder('t')
       .leftJoinAndSelect('t.project', 'project')
       .leftJoinAndSelect('t.sprint', 'sprint')
       .where('project.id = :projectId', { projectId })
       .andWhere('t.sprintId IS NULL')
-      // ENUM üzerinde LOWER çalıştırmak için text'e CAST ediyoruz
+      // ENUM üzerinde LOWER çalıştırmak için text'e CAST
       .andWhere('(t.status IS NULL OR LOWER(t.status::text) != :completed)', { completed: 'completed' })
       .orderBy('t.id', 'DESC')
       .getMany()
@@ -157,8 +168,8 @@ export class SprintService {
       throw new BadRequestException('Görev belirtilen sprintte değil')
     }
 
-    task.sprint = null;
-    (task as any).sprintId = null
+    task.sprint = null
+    ;(task as any).sprintId = null
     return this.taskRepo.save(task)
   }
 
@@ -191,9 +202,7 @@ export class SprintService {
 
     // Stats
     const total = tasks.length
-    let completed = 0,
-      inProgress = 0,
-      waiting = 0
+    let completed = 0, inProgress = 0, waiting = 0
     for (const t of tasks) {
       const st = this.normalizeStatus((t as any).status)
       if (st === 'completed') completed++
@@ -217,7 +226,6 @@ export class SprintService {
     for (const t of tasks) {
       const norm = this.normalizeStatus((t as any).status)
       if (norm !== 'completed') continue
-      // completedAt varsa onu, yoksa updatedAt'i gün say
       const when =
         (t as any).completedAt
           ? this.ymd((t as any).completedAt)
@@ -254,5 +262,104 @@ export class SprintService {
       today: todayYmd,
       charts: { dates, ideal, actualRemaining, completedPerDay, cumulativeCompleted },
     }
+  }
+
+  /* ----------------------------- Burnup (active sprint) ----------------------------- */
+
+  async burnupActive(projectId: number) {
+    const sprint = await this.findActiveSprintOrNull(projectId)
+    if (!sprint) {
+      return { dates: [], cumulativeCompleted: [], scopePerDay: [] }
+    }
+
+    const tasks = await this.taskRepo.find({
+      where: { sprint: { id: sprint.id } },
+      select: ['id', 'createdAt', 'completedAt'],
+      loadRelationIds: true,
+    })
+
+    const start = this.ymd(sprint.startDate)
+    const end = this.ymd(sprint.endDate)
+    const dates = this.dateRange(start, end)
+
+    const scopePerDay = dates.map((d) =>
+      tasks.filter((t) => this.ymd(t.createdAt) <= d).length
+    )
+
+    const cumulativeCompleted = dates.map((d) =>
+      tasks.filter((t) => t.completedAt && this.ymd(t.completedAt) <= d).length
+    )
+
+    return { dates, cumulativeCompleted, scopePerDay }
+  }
+
+  /* ----------------------------- Throughput (active sprint) ----------------------------- */
+
+  async throughputActive(projectId: number) {
+    const sprint = await this.findActiveSprintOrNull(projectId)
+    if (!sprint) return { dates: [], completedPerDay: [] }
+
+    const start = this.ymd(sprint.startDate)
+    const end = this.ymd(sprint.endDate)
+    const dates = this.dateRange(start, end)
+
+    const tasks = await this.taskRepo.find({
+      where: { sprint: { id: sprint.id } },
+      select: ['id', 'completedAt'],
+      loadRelationIds: true,
+    })
+
+    const completedPerDay = dates.map((d) =>
+      tasks.filter((t) => t.completedAt && this.ymd(t.completedAt) === d).length
+    )
+
+    return { dates, completedPerDay }
+  }
+
+  /* ----------------------------- Velocity (last N sprints) ----------------------------- */
+
+  async velocity(projectId: number, limit = 6, type: 'count' | 'points' = 'count') {
+    const sprints = await this.sprintRepo.find({
+      where: { project: { id: projectId } as any },
+      order: { startDate: 'DESC' },
+      take: limit,
+    })
+    if (!sprints.length) return []
+
+    const ids = sprints.map((s) => s.id)
+
+    const tasks = await this.taskRepo.find({
+      where: { sprint: { id: In(ids) } },
+      select: ['id', 'sprintId', 'completedAt' /* ,'storyPoints' */],
+      loadRelationIds: true,
+    })
+
+    const bySprint = new Map<number, { value: number }>()
+    for (const s of sprints) bySprint.set(s.id, { value: 0 })
+
+    for (const t of tasks) {
+      if (!t.completedAt) continue
+      const s = sprints.find((sp) => sp.id === (t as any).sprintId)
+      if (!s) continue
+      const completedDay = this.ymd(t.completedAt)
+      if (completedDay >= this.ymd(s.startDate) && completedDay <= this.ymd(s.endDate)) {
+        if (type === 'count') {
+          bySprint.get(s.id)!.value += 1
+        } else {
+          const sp = (t as any).storyPoints ?? 1
+          bySprint.get(s.id)!.value += Number(sp)
+        }
+      }
+    }
+
+    return sprints
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .map((s) => ({
+        sprintId: s.id,
+        sprintName: s.name,
+        start: s.startDate,
+        end: s.endDate,
+        value: bySprint.get(s.id)?.value ?? 0,
+      }))
   }
 }

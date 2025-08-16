@@ -10,6 +10,7 @@ import {
   UseGuards,
   UseInterceptors,
   ClassSerializerInterceptor,
+  Query as HttpQuery, // ⬅️ dikkat
 } from '@nestjs/common'
 import { SprintService } from './sprint.service'
 import { CreateSprintDto } from './dto/create-sprint.dto'
@@ -26,7 +27,8 @@ import { plainToInstance } from 'class-transformer'
 export class SprintController {
   constructor(private readonly sprintService: SprintService) {}
 
-  // Sprint oluştur
+  /* ----------------------------- Create ----------------------------- */
+
   @Post()
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async create(
@@ -37,7 +39,8 @@ export class SprintController {
     return new ResponseSprintDto(sprint)
   }
 
-  // Projeye ait tüm sprintler
+  /* ----------------------------- List / Get ----------------------------- */
+
   @Get('project/:projectId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async listByProject(
@@ -48,7 +51,6 @@ export class SprintController {
     return list.map((s) => new ResponseSprintDto(s))
   }
 
-  // Proje için aktif sprint (bugüne göre)
   @Get('active/:projectId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async getActiveForProject(
@@ -58,7 +60,6 @@ export class SprintController {
     return s ? new ResponseSprintDto(s) : null
   }
 
-  // Proje için aktif sprint özeti (grafikler + istatistikler)
   @Get('active/:projectId/summary')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async getActiveSummaryForProject(
@@ -80,7 +81,7 @@ export class SprintController {
     return new ResponseSprintSummaryDto({
       sprint: new ResponseSprintDto(res.sprint),
       tasks: plainToInstance(ResponseSprintTaskDto, res.tasks, {
-        excludeExtraneousValues: true,   // 👈 sadece @Expose alanları kalsın
+        excludeExtraneousValues: true,
       }),
       stats: res.stats,
       remainingDays: res.remainingDays,
@@ -89,7 +90,6 @@ export class SprintController {
     })
   }
 
-  // Bir sprint'teki görevler
   @Get(':sprintId/tasks')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async tasksOfSprint(
@@ -99,7 +99,6 @@ export class SprintController {
     return tasks.map((t) => new ResponseSprintTaskDto(t))
   }
 
-  // Projede sprint'e atanabilir (sprintsiz) görevler
   @Get('project/:projectId/available-tasks')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async availableTasksForProject(
@@ -109,7 +108,6 @@ export class SprintController {
     return tasks.map((t) => new ResponseSprintTaskDto(t))
   }
 
-  // Görevi sprint'e ata
   @Post(':sprintId/tasks/:taskId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async assignTask(
@@ -121,7 +119,6 @@ export class SprintController {
     return new ResponseSprintTaskDto(task)
   }
 
-  // Görevi sprint'ten çıkar
   @Delete(':sprintId/tasks/:taskId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async removeTask(
@@ -133,7 +130,6 @@ export class SprintController {
     return new ResponseSprintTaskDto(task)
   }
 
-  // Tek sprint detay
   @Get(':id')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
   async getOne(
@@ -142,4 +138,37 @@ export class SprintController {
     const sprint = await this.sprintService.getOne(id)
     return new ResponseSprintDto(sprint)
   }
+
+  /* ----------------------------- Charts (Analytics) ----------------------------- */
+
+  // Burnup (active sprint)
+  @Get('active/:projectId/burnup')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async burnupActive(
+    @Param('projectId', ParseIntPipe) projectId: number,
+  ) {
+    return this.sprintService.burnupActive(projectId)
+  }
+
+  // Throughput (active sprint)
+  @Get('active/:projectId/throughput')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async throughputActive(
+    @Param('projectId', ParseIntPipe) projectId: number,
+  ) {
+    return this.sprintService.throughputActive(projectId)
+  }
+
+
+  @Get('velocity/:projectId/:limit/:type')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async velocityParam(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Param('limit', ParseIntPipe) limit: number,
+    @Param('type') type: 'count' | 'points',
+  ) {
+    const t = (type === 'points' ? 'points' : 'count') as 'count' | 'points'
+    return this.sprintService.velocity(projectId, limit, t)
+  }
+
 }
