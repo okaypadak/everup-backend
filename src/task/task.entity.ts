@@ -9,25 +9,28 @@ import {
   ManyToMany,
   OneToOne,
   JoinTable,
+  UpdateDateColumn,
+  Index,
 } from 'typeorm';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
 import { TaskDependency } from './task-dependency.entity';
 import { Customer } from '../customer/customer.entity';
 import { TaskLabel } from './task-label.entity';
+import { Sprint } from '../sprint/sprint.entity';
 
 export enum TaskType {
   TASK = 'task',
   TEST = 'test',
   BUG = 'bug',
-  APPROVAL = 'approval'
+  APPROVAL = 'approval',
 }
 
 export enum TaskStatus {
   READY = 'Ready',
   IN_PROGRESS = 'In Progress',
   COMPLETED = 'Completed',
-  WAITING = 'Waiting'
+  WAITING = 'Waiting',
 }
 
 export enum MarketingTaskStatus {
@@ -36,13 +39,13 @@ export enum MarketingTaskStatus {
   UNREACHABLE = 'UNREACHABLE',
   IN_NEGOTIATION = 'IN_NEGOTIATION',
   WON = 'WON',
-  LOST = 'LOST'
+  LOST = 'LOST',
 }
 
 export enum TaskLevel {
   NORMAL = 'normal',
   PRIORITY = 'priority',
-  CRITICAL = 'critical'
+  CRITICAL = 'critical',
 }
 
 @Entity()
@@ -69,13 +72,29 @@ export class Task {
   project: Project;
 
   @CreateDateColumn()
+  @Index('idx_task_created_at')
   createdAt: Date;
+
+  @UpdateDateColumn()
+  @Index('idx_task_updated_at')
+  updatedAt: Date;
+
+  // İşin fiilen başlanma zamanı (Cycle/Aging WIP için önerilir)
+  @Column({ type: 'timestamp', nullable: true })
+  @Index('idx_task_started_at')
+  startedAt?: Date | null;
+
+  // İşin tamamlandığı zaman (Lead time / Predictability / Throughput için)
+  @Column({ type: 'timestamp', nullable: true })
+  @Index('idx_task_completed_at')
+  completedAt?: Date | null;
 
   @Column({
     type: 'enum',
     enum: TaskStatus,
     default: TaskStatus.READY,
   })
+  @Index('idx_task_status')
   status: TaskStatus;
 
   @Column({
@@ -102,10 +121,10 @@ export class Task {
   @Column({ type: 'timestamp', nullable: true })
   deadline?: Date;
 
-  @OneToMany(() => TaskDependency, dep => dep.task, { cascade: true })
+  @OneToMany(() => TaskDependency, (dep) => dep.task, { cascade: true })
   dependencies: TaskDependency[];
 
-  @OneToMany(() => TaskDependency, dep => dep.dependsOn, { cascade: true })
+  @OneToMany(() => TaskDependency, (dep) => dep.dependsOn, { cascade: true })
   dependents: TaskDependency[];
 
   @OneToOne(() => Customer, (customer) => customer.task)
@@ -115,14 +134,16 @@ export class Task {
   @ManyToMany(() => TaskLabel, { eager: true })
   @JoinTable({
     name: 'task_label_dependency',
-    joinColumn: {
-      name: 'taskId',
-      referencedColumnName: 'id',
-    },
-    inverseJoinColumn: {
-      name: 'labelId',
-      referencedColumnName: 'id',
-    },
+    joinColumn: { name: 'taskId', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'labelId', referencedColumnName: 'id' },
   })
   labels: TaskLabel[];
+
+  @ManyToOne(() => Sprint, (s) => s.tasks, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'sprintId' })
+  sprint: Sprint | null;
+
+  @Column({ type: 'int', nullable: true })
+  @Index('idx_task_sprint_id')
+  sprintId: number | null;
 }

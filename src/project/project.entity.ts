@@ -12,6 +12,7 @@ import { User } from '../user/user.entity';
 import { Task } from '../task/task.entity';
 import { Customer } from '../customer/customer.entity';
 import { ProjectUser } from './project-user.entity';
+import { Sprint } from '../sprint/sprint.entity'
 
 @Entity()
 export class Project {
@@ -38,4 +39,7 @@ export class Project {
 
   @OneToMany(() => ProjectUser, (pu) => pu.project)
   userLinks: ProjectUser[];
+
+  @OneToMany(() => Sprint, (sprint) => sprint.project)
+  sprints: Sprint[]
 }

@@ -8,7 +8,8 @@ import { Project } from '../project/project.entity';
 import { Comment } from '../comment/comment.entity';
 import { TaskDependency } from './task-dependency.entity';
 import { TaskLabel } from './task-label.entity';
-import { NotificationModule } from '../notification/notification.module'; // ✅ EKLENDİ
+import { NotificationModule } from '../notification/notification.module';
+import { Sprint } from '../sprint/sprint.entity'; // ✅ EKLENDİ
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { NotificationModule } from '../notification/notification.module'; // ✅
       Project,
       Comment,
       TaskDependency,
+      Sprint,
     ]),
     NotificationModule,
   ],

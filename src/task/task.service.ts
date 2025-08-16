@@ -59,22 +59,14 @@ export class TaskService {
       task.deadline = new Date(createTaskDto.deadline);
     }
 
-    if (
-      Array.isArray(createTaskDto.labelIds) &&
-      createTaskDto.labelIds.length > 0
-    ) {
-      const labels = await this.labelRepo.findBy({
-        id: In(createTaskDto.labelIds),
-      });
+    if (Array.isArray(createTaskDto.labelIds) && createTaskDto.labelIds.length > 0) {
+      const labels = await this.labelRepo.findBy({ id: In(createTaskDto.labelIds) });
       task.labels = labels;
     }
 
     const savedTask = await this.taskRepository.save(task);
 
-    if (
-      Array.isArray(createTaskDto.dependencyIds) &&
-      createTaskDto.dependencyIds.length > 0
-    ) {
+    if (Array.isArray(createTaskDto.dependencyIds) && createTaskDto.dependencyIds.length > 0) {
       const deps = createTaskDto.dependencyIds.map((depId) => {
         const dep = new TaskDependency();
         dep.task = savedTask;
@@ -97,6 +89,12 @@ export class TaskService {
     }
   }
 
+  /**
+   * Görev durumunu günceller.
+   * - IN_PROGRESS: startedAt yoksa now
+   * - COMPLETED: completedAt=now; startedAt yoksa createdAt (yoksa now)
+   * - COMPLETED -> başka durum: completedAt=null (reopen)
+   */
   async updateStatus(id: number, status: TaskStatus): Promise<Task> {
     const task = await this.taskRepository.findOne({
       where: { id },
@@ -105,9 +103,36 @@ export class TaskService {
 
     if (!task) throw new NotFoundException('Görev bulunamadı');
 
+    const now = new Date();
+
+    // Başlatıldı
+    if (status === TaskStatus.IN_PROGRESS) {
+      if (!task.startedAt) task.startedAt = now;
+      // reopen edildiyse tamamlanma tarihini temizle
+      if (task.completedAt) task.completedAt = null;
+    }
+
+    // Tamamlandı
+    if (status === TaskStatus.COMPLETED) {
+      if (!task.startedAt) {
+        // doğrudan complete edildiyse en azından makul bir başlangıç zamanı yaz
+        task.startedAt = task.createdAt ?? now;
+      }
+      task.completedAt = now;
+    }
+
+    // Reopen (Completed dışındaki statülere dönüşte completedAt'ı temizle)
+    if (
+      task.status === TaskStatus.COMPLETED &&
+      status !== TaskStatus.COMPLETED
+    ) {
+      task.completedAt = null;
+    }
+
     task.status = status;
     await this.taskRepository.save(task);
 
+    // Tamamlanan bir görevin bağımlılarını READY'e çekme (senin mevcut mantığın)
     if (status === TaskStatus.COMPLETED) {
       const dependents = await this.taskDepRepo.find({
         where: { dependsOn: { id: task.id } },
@@ -130,6 +155,17 @@ export class TaskService {
     return task;
   }
 
+  /** Kısayol: Görevi başlat (IN_PROGRESS) */
+  async startTask(id: number): Promise<Task> {
+    return this.updateStatus(id, TaskStatus.IN_PROGRESS);
+    // İstersen burada ek iş mantığı da ekleyebilirsin.
+  }
+
+  /** Kısayol: Görevi tamamla (COMPLETED) */
+  async completeTask(id: number): Promise<Task> {
+    return this.updateStatus(id, TaskStatus.COMPLETED);
+  }
+
   async findAllByUserAndProject(projectId: number): Promise<ResponseTaskDto[]> {
     const tasks = await this.taskRepository.find({
       where: {
@@ -145,15 +181,10 @@ export class TaskService {
       order: { createdAt: 'DESC' },
     });
 
-    return tasks.map((task) => {
-      return new ResponseTaskDto(task);
-    });
+    return tasks.map((task) => new ResponseTaskDto(task));
   }
 
-  async findAllByUser(user: {
-    id: number;
-    role: string;
-  }): Promise<ResponseTaskDto[]> {
+  async findAllByUser(user: { id: number; role: string }): Promise<ResponseTaskDto[]> {
     const tasks = await this.taskRepository.find({
       where: { assignedTo: { id: user.id } },
       relations: [
@@ -167,15 +198,10 @@ export class TaskService {
       order: { createdAt: 'DESC' },
     });
 
-    return tasks.map((task) => {
-      const dto = new ResponseTaskDto(task);
-      return dto;
-    });
+    return tasks.map((task) => new ResponseTaskDto(task));
   }
 
-  async findTaskDetailWithDependencies(
-    taskId: number,
-  ): Promise<ResponseTaskDetailDto> {
+  async findTaskDetailWithDependencies(taskId: number): Promise<ResponseTaskDetailDto> {
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
       relations: ['assignedTo', 'creator', 'project', 'labels'],
@@ -233,10 +259,7 @@ export class TaskService {
 
     if (!task) throw new NotFoundException('Task bulunamadı');
 
-    if (
-      task.creator.id !== user.id &&
-      !['admin', 'director'].includes(user.role)
-    ) {
+    if (task.creator.id !== user.id && !['admin', 'director'].includes(user.role)) {
       throw new ForbiddenException('Bu taskı silme yetkiniz yok');
     }
 
@@ -254,10 +277,7 @@ export class TaskService {
     }
   }
 
-  async filterByProjectAndLabels(
-    projectId: number,
-    labelIds: number[],
-  ): Promise<ResponseTaskDto[]> {
+  async filterByProjectAndLabels(projectId: number, labelIds: number[]): Promise<ResponseTaskDto[]> {
     const tasks = await this.taskRepository
       .createQueryBuilder('task')
       .leftJoinAndSelect('task.labels', 'label')
@@ -266,9 +286,7 @@ export class TaskService {
       .andWhere('label.id IN (:...labelIds)', { labelIds })
       .getMany();
 
-    return tasks.map((task) => {
-      return new ResponseTaskDto(task);
-    });
+    return tasks.map((task) => new ResponseTaskDto(task));
   }
 
   async findTasksCreatedByUser(user: User): Promise<ResponseTaskDto[]> {
@@ -288,6 +306,6 @@ export class TaskService {
       order: { createdAt: 'DESC' },
     });
 
-    return tasks.map(task => new ResponseTaskDto(task));
+    return tasks.map((task) => new ResponseTaskDto(task));
   }
 }
