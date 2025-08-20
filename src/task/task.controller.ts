@@ -92,4 +92,10 @@ export class TaskController {
   async getTasksCreatedByUser(@Req() req: any): Promise<ResponseTaskDto[]> {
     return this.taskService.findTasksCreatedByUser(req.user);
   }
+
+  @Post('maintenance/backfill-unique-codes')
+  @Roles('admin') // sadece admin çalıştırsın
+  async backfillOnce() {
+    return this.taskService.backfillUniqueCodes(1000);
+  }
 }
