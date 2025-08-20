@@ -15,6 +15,7 @@ import { ResponseTaskDetailDto } from './dto/response-task-detail.dto';
 import { Comment } from '../comment/comment.entity';
 import { TaskDependency } from './task-dependency.entity';
 import { TaskLabel } from './task-label.entity';
+import { ulid } from 'ulid';
 
 @Injectable()
 export class TaskService {
@@ -307,5 +308,39 @@ export class TaskService {
     });
 
     return tasks.map((task) => new ResponseTaskDto(task));
+  }
+
+    async backfillUniqueCodes(batchSize = 1000): Promise<{ updated: number }> {
+    let updated = 0;
+
+    // Döngü: her seferinde boş uniqueCode'lu belli sayıda task çek ve güncelle
+    while (true) {
+      const tasks = await this.taskRepository
+        .createQueryBuilder('task')
+        .where('task."uniqueCode" IS NULL OR task."uniqueCode" = :empty', { empty: '' })
+        .orderBy('task.id', 'ASC')
+        .take(batchSize)
+        .getMany();
+
+      if (tasks.length === 0) break;
+
+      for (const t of tasks) {
+        const d = t.createdAt ?? new Date();
+        const ym = d.toISOString().slice(0, 7).replace('-', '');
+        const code = `TCKT-${ym}-${ulid()}`;
+
+        try {
+          await this.taskRepository.update({ id: t.id, uniqueCode: null as any }, { uniqueCode: code });
+          updated++;
+        } catch (e: any) {
+          // Nadir de olsa unique çakışma vs. olursa yeniden dene
+          const fallback = `TCKT-${ym}-${ulid()}`;
+          await this.taskRepository.update(t.id, { uniqueCode: fallback });
+          updated++;
+        }
+      }
+    }
+
+    return { updated };
   }
 }
