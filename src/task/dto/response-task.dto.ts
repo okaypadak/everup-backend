@@ -36,6 +36,7 @@ export class ResponseTaskDto {
 
   constructor(task: any) {
     this.id = task.id;
+    this.uniqueCode = task.uniqueCode;
     this.title = task.title;
     this.description = task.description;
     this.status = task.status;

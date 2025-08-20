@@ -1,10 +1,6 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { Task, TaskLevel, TaskStatus, TaskType } from './task.entity';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
@@ -19,6 +15,9 @@ import { ulid } from 'ulid';
 
 @Injectable()
 export class TaskService {
+
+  private readonly logger = new Logger(TaskService.name);
+
   constructor(
     @InjectRepository(Task)
     private readonly taskRepository: Repository<Task>,
@@ -311,37 +310,65 @@ export class TaskService {
     return tasks.map((task) => new ResponseTaskDto(task));
   }
 
-    async backfillUniqueCodes(batchSize = 1000): Promise<{ updated: number }> {
+  async backfillUniqueCodesAll(): Promise<{
+    startedAt: string;
+    finishedAt: string;
+    durationMs: number;
+    total: number;
+    updated: number;
+    failed: number;
+  }> {
+    const startedAt = new Date();
+    const t0 = Date.now();
+    this.logger.log('Backfill (uniqueCode) başladı');
+
+    // Sadece gerekli kolonlar
+    const toFix = await this.taskRepository.find({
+      where: [{ uniqueCode: IsNull() }, { uniqueCode: '' }],
+      select: { id: true, createdAt: true },
+      order: { id: 'ASC' },
+    });
+
+    this.logger.log(`Backfill: ${toFix.length} adet uniqueCode olmayan task bulundu`);
+
     let updated = 0;
+    let failed = 0;
 
-    // Döngü: her seferinde boş uniqueCode'lu belli sayıda task çek ve güncelle
-    while (true) {
-      const tasks = await this.taskRepository
-        .createQueryBuilder('task')
-        .where('task."uniqueCode" IS NULL OR task."uniqueCode" = :empty', { empty: '' })
-        .orderBy('task.id', 'ASC')
-        .take(batchSize)
-        .getMany();
+    for (const t of toFix) {
+      const d = t.createdAt ?? new Date();
+      const ym = d.toISOString().slice(0, 7).replace('-', '');
+      let code = `TCKT-${ym}-${ulid()}`;
 
-      if (tasks.length === 0) break;
-
-      for (const t of tasks) {
-        const d = t.createdAt ?? new Date();
-        const ym = d.toISOString().slice(0, 7).replace('-', '');
-        const code = `TCKT-${ym}-${ulid()}`;
-
+      try {
+        await this.taskRepository.update(t.id, { uniqueCode: code });
+        updated++;
+      } catch {
         try {
-          await this.taskRepository.update({ id: t.id, uniqueCode: null as any }, { uniqueCode: code });
+          code = `TCKT-${ym}-${ulid()}`;
+          await this.taskRepository.update(t.id, { uniqueCode: code });
           updated++;
-        } catch (e: any) {
-          // Nadir de olsa unique çakışma vs. olursa yeniden dene
-          const fallback = `TCKT-${ym}-${ulid()}`;
-          await this.taskRepository.update(t.id, { uniqueCode: fallback });
-          updated++;
+        } catch (e2) {
+          failed++;
+          this.logger.warn(`Backfill: id=${t.id} güncellenemedi`);
         }
       }
     }
 
-    return { updated };
+    const durationMs = Date.now() - t0;
+    const finishedAt = new Date();
+
+    this.logger.log(
+      `Backfill bitti → total=${toFix.length}, updated=${updated}, failed=${failed}, duration=${durationMs}ms`,
+    );
+
+    return {
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      durationMs,
+      total: toFix.length,
+      updated,
+      failed,
+    };
   }
 }
+

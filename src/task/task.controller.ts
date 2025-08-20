@@ -93,9 +93,14 @@ export class TaskController {
     return this.taskService.findTasksCreatedByUser(req.user);
   }
 
-  @Post('maintenance/backfill-unique-codes')
-  @Roles('admin') // sadece admin çalıştırsın
-  async backfillOnce() {
-    return this.taskService.backfillUniqueCodes(1000);
+  @Post('maintenance/backfill-unique-codes-all')
+  @Roles('admin')
+  async runBackfillAll() {
+    const res = await this.taskService.backfillUniqueCodesAll();
+    // Controller seviyesinde de tek satır özet log
+    console.log(
+      `[Backfill endpoint] total=${res.total}, updated=${res.updated}, failed=${res.failed}, duration=${res.durationMs}ms`,
+    );
+    return res;
   }
 }

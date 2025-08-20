@@ -10,6 +10,9 @@ export class ResponseTaskDetailDto {
   title: string;
 
   @Expose()
+  uniqueCode: string;
+
+  @Expose()
   description: string;
 
   @Expose()
