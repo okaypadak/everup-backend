@@ -19,6 +19,7 @@ import { TaskDependency } from './task-dependency.entity';
 import { Customer } from '../customer/customer.entity';
 import { TaskLabel } from './task-label.entity';
 import { Sprint } from '../sprint/sprint.entity';
+import { ulid } from 'ulid';
 
 export enum TaskType {
   TASK = 'task',
