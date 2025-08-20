@@ -11,6 +11,7 @@ import {
   JoinTable,
   UpdateDateColumn,
   Index,
+  BeforeInsert
 } from 'typeorm';
 import { User } from '../user/user.entity';
 import { Project } from '../project/project.entity';
