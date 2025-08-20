@@ -223,6 +223,7 @@ export class TaskService {
 
     const response = {
       id: task.id,
+      uniqueCode: task.uniqueCode,
       title: task.title,
       description: task.description,
       createdAt: task.createdAt,
