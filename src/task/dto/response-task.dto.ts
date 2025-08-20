@@ -5,6 +5,9 @@ export class ResponseTaskDto {
   id: number;
 
   @Expose()
+  uniqueCode: string;
+
+  @Expose()
   title: string;
 
   @Expose()
