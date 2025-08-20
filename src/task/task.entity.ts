@@ -53,6 +53,10 @@ export class Task {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Index('uq_task_unique_code', { unique: true })
+  @Column({ type: 'varchar', length: 40, unique: true, nullable: true })
+  uniqueCode!: string | null;
+
   @Column()
   title: string;
 
@@ -146,4 +150,13 @@ export class Task {
   @Column({ type: 'int', nullable: true })
   @Index('idx_task_sprint_id')
   sprintId: number | null;
+
+  @BeforeInsert()
+  private _ensureUniqueCode() {
+    if (!this.uniqueCode) {
+      const now = new Date();
+      const ym = now.toISOString().slice(0, 7).replace('-', '');
+      this.uniqueCode = `TCKT-${ym}-${ulid()}`;
+    }
+  }
 }
