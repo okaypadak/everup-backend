@@ -8,7 +8,8 @@ import {
   Req,
   UseGuards,
   Patch,
-  Delete, UseInterceptors,
+  Delete,
+  UseInterceptors,
 } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -16,7 +17,6 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { TaskStatus } from './task.entity';
-import { CreateTaskNotificationInterceptor } from '../notification/interceptor/task-new.interceptor';
 import { TaskCompletedInterceptor } from '../notification/interceptor/task-completed.interceptor';
 
 @Controller('tasks')
@@ -26,7 +26,6 @@ export class TaskController {
 
   @Post()
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  @UseInterceptors(CreateTaskNotificationInterceptor)
   async create(@Req() req: any, @Body() createTaskDto: CreateTaskDto) {
     await this.taskService.create(createTaskDto, req.user);
     return { success: true, message: 'Tekli task başarıyla oluşturuldu' };
