@@ -17,7 +17,6 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { TaskStatus } from './task.entity';
-import { TaskCompletedInterceptor } from '../notification/interceptor/task-completed.interceptor';
 
 @Controller('tasks')
 @UseGuards(RolesGuard)
@@ -40,8 +39,10 @@ export class TaskController {
 
   @Patch(':id/status')
   @Roles('admin', 'director', 'developer')
-  @UseInterceptors(TaskCompletedInterceptor)
-  async updateStatus(@Param('id') id: number, @Body('status') status: TaskStatus) {
+  async updateStatus(
+    @Param('id') id: number,
+    @Body('status') status: TaskStatus,
+  ) {
     return this.taskService.updateStatus(id, status);
   }
 
@@ -54,7 +55,9 @@ export class TaskController {
 
   @Get('project/:projectId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  async findAllByProject(@Param('projectId') projectId: number): Promise<ResponseTaskDto[]> {
+  async findAllByProject(
+    @Param('projectId') projectId: number,
+  ): Promise<ResponseTaskDto[]> {
     return this.taskService.findAllByUserAndProject(projectId);
   }
 
