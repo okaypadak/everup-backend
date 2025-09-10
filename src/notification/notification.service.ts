@@ -1,12 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Notification } from './notification.entity';
 import { User } from '../user/user.entity';
-import { Task } from '../task/task.entity';
 
 @Injectable()
 export class NotificationService {
+  private readonly logger = new Logger(NotificationService.name);
+
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepo: Repository<Notification>,
@@ -32,14 +33,11 @@ export class NotificationService {
     return this.notificationRepo.save(notif);
   }
 
-  async createNotification(params: {
-    user: User;
-    message: string;
-  }) {
+  async createNotification(params: { user: User; message: string }) {
     try {
-      console.log('[NotificationService] createNotification started');
-      console.log('  User ID:', params.user?.id);
-      console.log('  Message:', params.message);
+      this.logger.log('[NotificationService] createNotification started');
+      this.logger.log(`  User ID: ${params.user?.id}`);
+      this.logger.log(`  Message: ${params.message}`);
 
       const notif = this.notificationRepo.create({
         user: params.user,
@@ -48,11 +46,13 @@ export class NotificationService {
 
       const saved = await this.notificationRepo.save(notif);
 
-      console.log('[NotificationService] Notification saved with ID:', saved.id);
+      this.logger.log(
+        `[NotificationService] Notification saved with ID: ${saved.id}`,
+      );
       return saved;
     } catch (error) {
-      console.error('[NotificationService] HATA:', error);
-      throw error; // isteğe bağlı, istersen swallow edebilirsin
+      this.logger.error('[NotificationService] HATA:', error);
+      throw error;
     }
   }
 }
