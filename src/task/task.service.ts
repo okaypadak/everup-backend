@@ -18,7 +18,6 @@ import { TaskDependency } from './task-dependency.entity';
 import { TaskLabel } from './task-label.entity';
 import { NotificationService } from '../notification/notification.service';
 import { ulid } from 'ulid';
-import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class TaskService {
