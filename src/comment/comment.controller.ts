@@ -5,7 +5,6 @@ import { ResponseCommentDto } from './dto/response-comment.dto';
 import { ClassSerializerInterceptor } from '@nestjs/common';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { CommentNewInterceptor } from '../notification/interceptor/comment-new.interceptor';
 
 @Controller('comments')
 @UseGuards(RolesGuard)
@@ -27,7 +26,6 @@ export class CommentController {
 
   @Post()
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  @UseInterceptors(CommentNewInterceptor)
   async createComment(@Body() dto: CreateCommentDto, @Req() req: any) {
     try {
       await this.commentService.createComment(dto, req.user.id);

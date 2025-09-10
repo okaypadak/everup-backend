@@ -7,8 +7,9 @@ import { Repository } from 'typeorm';
 import { Comment } from './comment.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { Task } from '../task/task.entity';
-import { User } from '../user/user.entity';
 import { ResponseCommentDto } from './dto/response-comment.dto';
+import { NotificationService } from '../notification/notification.service';
+import { User } from '../user/user.entity';
 
 @Injectable()
 export class CommentService {
@@ -17,11 +18,12 @@ export class CommentService {
     private readonly commentRepo: Repository<Comment>,
     @InjectRepository(Task)
     private readonly taskRepo: Repository<Task>,
+    private readonly notificationService: NotificationService,
   ) {}
 
 
 
-  async createComment(dto: CreateCommentDto, author: User): Promise<Comment> {
+  async createComment(dto: CreateCommentDto, authorId: number): Promise<Comment> {
     const task = await this.taskRepo.findOne({
       where: { id: dto.taskId },
     });
@@ -33,7 +35,7 @@ export class CommentService {
     const comment = this.commentRepo.create({
       content: dto.content,
       task,
-      author,
+      author: { id: authorId } as User,
     });
 
     if (dto.parentId) {
@@ -48,7 +50,20 @@ export class CommentService {
       comment.parent = parent;
     }
 
-    return this.commentRepo.save(comment);
+    const savedComment = await this.commentRepo.save(comment);
+
+    try {
+      if (task.assignedTo && task.assignedTo.id !== authorId) {
+        await this.notificationService.createNotification({
+          user: task.assignedTo,
+          message: `Task "${task.title}" için yeni yorum: "${savedComment.content.slice(0, 40)}..."`,
+        });
+      }
+    } catch (err) {
+      console.error('[CommentService] Bildirim gönderilirken hata:', err);
+    }
+
+    return savedComment;
   }
 
   async findAllByTask(taskId: number): Promise<ResponseCommentDto[]> {
