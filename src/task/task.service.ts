@@ -16,6 +16,7 @@ import { ResponseTaskDetailDto } from './dto/response-task-detail.dto';
 import { Comment } from '../comment/comment.entity';
 import { TaskDependency } from './task-dependency.entity';
 import { TaskLabel } from './task-label.entity';
+import { NotificationService } from '../notification/notification.service';
 import { ulid } from 'ulid';
 import { NotificationService } from '../notification/notification.service';
 
@@ -92,6 +93,19 @@ export class TaskService {
 
       savedTask.status = TaskStatus.WAITING;
       await this.taskRepository.save(savedTask);
+    }
+
+    try {
+      const assignedTo = savedTask.assignedTo;
+      const creator = savedTask.creator;
+      if (assignedTo && creator && assignedTo.id !== creator.id) {
+        await this.notificationService.createNotification({
+          user: assignedTo,
+          message: `${creator.firstName ?? 'Birisi'}, sana "${savedTask.title}" adında bir görev atadı.`,
+        });
+      }
+    } catch (error) {
+      this.logger.error('Notification sending failed', error);
     }
 
     return savedTask;
