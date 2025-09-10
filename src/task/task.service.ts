@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { Task, TaskLevel, TaskStatus, TaskType } from './task.entity';
@@ -12,10 +17,10 @@ import { Comment } from '../comment/comment.entity';
 import { TaskDependency } from './task-dependency.entity';
 import { TaskLabel } from './task-label.entity';
 import { ulid } from 'ulid';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class TaskService {
-
   private readonly logger = new Logger(TaskService.name);
 
   constructor(
@@ -31,6 +36,7 @@ export class TaskService {
     private readonly taskDepRepo: Repository<TaskDependency>,
     @InjectRepository(TaskLabel)
     private readonly labelRepo: Repository<TaskLabel>,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async create(
@@ -59,14 +65,22 @@ export class TaskService {
       task.deadline = new Date(createTaskDto.deadline);
     }
 
-    if (Array.isArray(createTaskDto.labelIds) && createTaskDto.labelIds.length > 0) {
-      const labels = await this.labelRepo.findBy({ id: In(createTaskDto.labelIds) });
+    if (
+      Array.isArray(createTaskDto.labelIds) &&
+      createTaskDto.labelIds.length > 0
+    ) {
+      const labels = await this.labelRepo.findBy({
+        id: In(createTaskDto.labelIds),
+      });
       task.labels = labels;
     }
 
     const savedTask = await this.taskRepository.save(task);
 
-    if (Array.isArray(createTaskDto.dependencyIds) && createTaskDto.dependencyIds.length > 0) {
+    if (
+      Array.isArray(createTaskDto.dependencyIds) &&
+      createTaskDto.dependencyIds.length > 0
+    ) {
       const deps = createTaskDto.dependencyIds.map((depId) => {
         const dep = new TaskDependency();
         dep.task = savedTask;
@@ -132,15 +146,31 @@ export class TaskService {
     task.status = status;
     await this.taskRepository.save(task);
 
-    // Tamamlanan bir görevin bağımlılarını READY'e çekme (senin mevcut mantığın)
+    // Tamamlanan bir görevin bağımlılarını READY'e çekme ve kullanıcıları bilgilendirme
     if (status === TaskStatus.COMPLETED) {
       const dependents = await this.taskDepRepo.find({
         where: { dependsOn: { id: task.id } },
-        relations: ['task', 'task.dependencies', 'task.dependencies.dependsOn'],
+        relations: [
+          'task',
+          'task.assignedTo',
+          'task.dependencies',
+          'task.dependencies.dependsOn',
+        ],
       });
 
       for (const dep of dependents) {
         const dependentTask = dep.task;
+
+        if (
+          dependentTask.status === TaskStatus.WAITING &&
+          dependentTask.assignedTo
+        ) {
+          await this.notificationService.createNotification({
+            user: dependentTask.assignedTo,
+            message: `Bağlı olduğun görev "${task.title}" tamamlandı.`,
+          });
+        }
+
         const allDepsCompleted = dependentTask.dependencies.every(
           (d) => d.dependsOn.status === TaskStatus.COMPLETED,
         );
@@ -184,7 +214,10 @@ export class TaskService {
     return tasks.map((task) => new ResponseTaskDto(task));
   }
 
-  async findAllByUser(user: { id: number; role: string }): Promise<ResponseTaskDto[]> {
+  async findAllByUser(user: {
+    id: number;
+    role: string;
+  }): Promise<ResponseTaskDto[]> {
     const tasks = await this.taskRepository.find({
       where: { assignedTo: { id: user.id } },
       relations: [
@@ -201,7 +234,9 @@ export class TaskService {
     return tasks.map((task) => new ResponseTaskDto(task));
   }
 
-  async findTaskDetailWithDependencies(taskId: number): Promise<ResponseTaskDetailDto> {
+  async findTaskDetailWithDependencies(
+    taskId: number,
+  ): Promise<ResponseTaskDetailDto> {
     const task = await this.taskRepository.findOne({
       where: { id: taskId },
       relations: ['assignedTo', 'creator', 'project', 'labels'],
@@ -260,7 +295,10 @@ export class TaskService {
 
     if (!task) throw new NotFoundException('Task bulunamadı');
 
-    if (task.creator.id !== user.id && !['admin', 'director'].includes(user.role)) {
+    if (
+      task.creator.id !== user.id &&
+      !['admin', 'director'].includes(user.role)
+    ) {
       throw new ForbiddenException('Bu taskı silme yetkiniz yok');
     }
 
@@ -278,7 +316,10 @@ export class TaskService {
     }
   }
 
-  async filterByProjectAndLabels(projectId: number, labelIds: number[]): Promise<ResponseTaskDto[]> {
+  async filterByProjectAndLabels(
+    projectId: number,
+    labelIds: number[],
+  ): Promise<ResponseTaskDto[]> {
     const tasks = await this.taskRepository
       .createQueryBuilder('task')
       .leftJoinAndSelect('task.labels', 'label')
@@ -329,7 +370,9 @@ export class TaskService {
       order: { id: 'ASC' },
     });
 
-    this.logger.log(`Backfill: ${toFix.length} adet uniqueCode olmayan task bulundu`);
+    this.logger.log(
+      `Backfill: ${toFix.length} adet uniqueCode olmayan task bulundu`,
+    );
 
     let updated = 0;
     let failed = 0;
@@ -371,4 +414,3 @@ export class TaskService {
     };
   }
 }
-

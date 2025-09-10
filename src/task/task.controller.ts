@@ -8,7 +8,8 @@ import {
   Req,
   UseGuards,
   Patch,
-  Delete, UseInterceptors,
+  Delete,
+  UseInterceptors,
 } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -17,7 +18,6 @@ import { RolesGuard } from '../auth/roles.guard';
 import { ResponseTaskDto } from './dto/response-task.dto';
 import { TaskStatus } from './task.entity';
 import { CreateTaskNotificationInterceptor } from '../notification/interceptor/task-new.interceptor';
-import { TaskCompletedInterceptor } from '../notification/interceptor/task-completed.interceptor';
 
 @Controller('tasks')
 @UseGuards(RolesGuard)
@@ -41,8 +41,10 @@ export class TaskController {
 
   @Patch(':id/status')
   @Roles('admin', 'director', 'developer')
-  @UseInterceptors(TaskCompletedInterceptor)
-  async updateStatus(@Param('id') id: number, @Body('status') status: TaskStatus) {
+  async updateStatus(
+    @Param('id') id: number,
+    @Body('status') status: TaskStatus,
+  ) {
     return this.taskService.updateStatus(id, status);
   }
 
@@ -55,7 +57,9 @@ export class TaskController {
 
   @Get('project/:projectId')
   @Roles('admin', 'director', 'developer', 'tester', 'devOps')
-  async findAllByProject(@Param('projectId') projectId: number): Promise<ResponseTaskDto[]> {
+  async findAllByProject(
+    @Param('projectId') projectId: number,
+  ): Promise<ResponseTaskDto[]> {
     return this.taskService.findAllByUserAndProject(projectId);
   }
 
