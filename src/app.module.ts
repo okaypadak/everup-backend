@@ -13,6 +13,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { DocumentModule } from './document/document.module';
 import { TaskLabelModule } from './task/task-label.module';
 import { SprintModule } from './sprint/sprint.module';
+import { MeetingModule } from './meeting/meeting.module';
 
 console.log('✅ ENV VALUES ------------------');
 console.log('DB_HOST:', process.env.DB_HOST);
@@ -58,6 +59,7 @@ console.log('--------------------------------');
     CustomerModule,
     DocumentModule,
     SprintModule,
+    MeetingModule,
   ],
   controllers: [],
   providers: [],

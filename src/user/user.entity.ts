@@ -1,6 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToMany } from 'typeorm';
-import { Project } from '../project/project.entity';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  ManyToMany,
+} from 'typeorm';
 import { ProjectUser } from '../project/project-user.entity';
+import { Meeting } from '../meeting/meeting.entity';
 
 export enum UserRole {
   DEVELOPER = 'developer',
@@ -34,4 +40,10 @@ export class User {
 
   @OneToMany(() => ProjectUser, (pu) => pu.user)
   projectLinks: ProjectUser[];
+
+  @OneToMany(() => Meeting, (meeting) => meeting.createdBy)
+  createdMeetings: Meeting[];
+
+  @ManyToMany(() => Meeting, (meeting) => meeting.participants)
+  participatingMeetings: Meeting[];
 }
