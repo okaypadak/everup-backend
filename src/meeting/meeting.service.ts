@@ -11,6 +11,7 @@ import { Project } from '../project/project.entity';
 import { User } from '../user/user.entity';
 import { ProjectUser } from '../project/project-user.entity';
 import { CreateMeetingDto, CreateMeetingResponseDto } from './dto/create-meeting.dto';
+import { MeetingResponseDto, MeetingUserDto } from './dto/meeting-response.dto';
 
 @Injectable()
 export class MeetingService {
@@ -30,32 +31,10 @@ export class MeetingService {
     dto: CreateMeetingDto,
     creator: { id: number },
   ): Promise<CreateMeetingResponseDto> {
-    const project = await this.projectRepository.findOne({
-      where: { id: projectId },
-    });
-
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-
-    const creatorUser = await this.userRepository.findOne({
-      where: { id: creator.id },
-    });
-
-    if (!creatorUser) {
-      throw new NotFoundException('User not found');
-    }
-
-    const creatorMembership = await this.projectUserRepository.findOne({
-      where: {
-        project: { id: projectId },
-        user: { id: creatorUser.id },
-      },
-    });
-
-    if (!creatorMembership) {
-      throw new ForbiddenException('You are not a member of this project');
-    }
+    const { project, user: creatorUser } = await this.ensureProjectMembership(
+      projectId,
+      creator.id,
+    );
 
     const scheduledAt = this.combineDateAndTime(dto.meetingDate, dto.meetingTime);
 
@@ -103,11 +82,81 @@ export class MeetingService {
     };
   }
 
+  async findByProject(
+    projectId: number,
+    requester: { id: number },
+  ): Promise<MeetingResponseDto[]> {
+    const { project } = await this.ensureProjectMembership(
+      projectId,
+      requester.id,
+    );
+
+    const meetings = await this.meetingRepository.find({
+      where: { project: { id: project.id } },
+      relations: ['createdBy', 'participants'],
+    });
+
+    return meetings.map((meeting) => ({
+      id: meeting.id,
+      title: meeting.title,
+      scheduledAt: meeting.scheduledAt,
+      notes: meeting.notes ?? null,
+      location: meeting.location ?? null,
+      agenda: meeting.agenda,
+      createdBy: meeting.createdBy
+        ? this.toMeetingUserDto(meeting.createdBy)
+        : null,
+      participants: meeting.participants.map((participant) =>
+        this.toMeetingUserDto(participant),
+      ),
+    }));
+  }
+
   private combineDateAndTime(date: string, time: string): Date {
     const combined = new Date(`${date}T${time}`);
     if (Number.isNaN(combined.getTime())) {
       throw new BadRequestException('Invalid meeting date or time');
     }
     return combined;
+  }
+
+  private async ensureProjectMembership(
+    projectId: number,
+    userId: number,
+  ): Promise<{ project: Project; user: User }> {
+    const project = await this.projectRepository.findOne({
+      where: { id: projectId },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const membership = await this.projectUserRepository.findOne({
+      where: {
+        project: { id: projectId },
+        user: { id: user.id },
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this project');
+    }
+
+    return { project, user };
+  }
+
+  private toMeetingUserDto(user: User): MeetingUserDto {
+    const { id, firstName, lastName, email } = user;
+
+    return { id, firstName, lastName, email };
   }
 }
