@@ -4,15 +4,12 @@ import {
   Column,
   OneToMany,
   CreateDateColumn,
-  ManyToMany,
-  JoinTable,
-  ManyToOne,
 } from 'typeorm';
-import { User } from '../user/user.entity';
 import { Task } from '../task/task.entity';
 import { Customer } from '../customer/customer.entity';
 import { ProjectUser } from './project-user.entity';
-import { Sprint } from '../sprint/sprint.entity'
+import { Sprint } from '../sprint/sprint.entity';
+import { Meeting } from '../meeting/meeting.entity';
 
 @Entity()
 export class Project {
@@ -41,5 +38,8 @@ export class Project {
   userLinks: ProjectUser[];
 
   @OneToMany(() => Sprint, (sprint) => sprint.project)
-  sprints: Sprint[]
+  sprints: Sprint[];
+
+  @OneToMany(() => Meeting, (meeting) => meeting.project)
+  meetings: Meeting[];
 }
