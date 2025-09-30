@@ -5,6 +5,7 @@ import {
   Get,
   Param, ParseIntPipe,
   Post,
+  Query,
   Req,
   UseGuards,
   UseInterceptors,
@@ -16,6 +17,7 @@ import { Roles } from '../auth/roles.decorator';
 import { ProjectResponseDto, ProjectUsersResponseDto } from './dto/project-response.dto';
 import { MessageDto } from '../common/dto/message.dto';
 import { AssignUserDto } from './dto/assign-user.dto';
+import { ProjectTimelineQueryDto, ProjectTimelineResponseDto } from './dto/project-timeline.dto';
 
 
 @Controller('projects')
@@ -54,6 +56,15 @@ export class ProjectController {
   ): Promise<{ message: string }> {
     await this.projectService.assignUserToProject(projectId, dto);
     return { message: 'Kullanıcı projeye atandı' };
+  }
+
+  @Get(':projectId/timeline')
+  @Roles('admin', 'director', 'developer', 'tester', 'devOps')
+  async getProjectTimeline(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Query() query: ProjectTimelineQueryDto,
+  ): Promise<ProjectTimelineResponseDto> {
+    return this.projectService.getProjectTimeline(projectId, query);
   }
 
   @Delete(':projectId/users/:userId')
