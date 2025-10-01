@@ -14,6 +14,7 @@ import { DocumentModule } from './document/document.module';
 import { TaskLabelModule } from './task/task-label.module';
 import { SprintModule } from './sprint/sprint.module';
 import { MeetingModule } from './meeting/meeting.module';
+import { VoiceRoomModule } from './voice-room/voice-room.module';
 
 console.log('✅ ENV VALUES ------------------');
 console.log('DB_HOST:', process.env.DB_HOST);
@@ -60,6 +61,7 @@ console.log('--------------------------------');
     DocumentModule,
     SprintModule,
     MeetingModule,
+    VoiceRoomModule,
   ],
   controllers: [],
   providers: [],
