@@ -24,6 +24,7 @@ import {
   SctpParameters,
 } from 'mediasoup/node/lib/types';
 import { createWorker, types as mediasoupTypes } from 'mediasoup';
+import { VoiceRoomStateDto } from './dto/voice-room-state.dto';
 
 interface VoiceRoom {
   id: string;
@@ -220,6 +221,33 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
     });
 
     return consumer;
+  }
+
+  getRoomState(roomId: string): VoiceRoomStateDto {
+    const room = this.rooms.get(roomId);
+
+    if (!room) {
+      return {
+        roomId,
+        peers: [],
+      };
+    }
+
+    return {
+      roomId,
+      peers: Array.from(room.peers.entries()).map(([peerId, peer]) => ({
+        peerId,
+        producers: Array.from(peer.producers.values()).map((producer) => ({
+          id: producer.id,
+          kind: producer.kind,
+        })),
+        consumers: Array.from(peer.consumers.values()).map((consumer) => ({
+          id: consumer.id,
+          producerId: consumer.producerId,
+          kind: consumer.kind,
+        })),
+      })),
+    };
   }
 
   async closePeer(roomId: string, peerId: string): Promise<void> {
