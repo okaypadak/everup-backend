@@ -9,6 +9,11 @@ import { ConsumeDto } from './dto/consume.dto';
 export class VoiceRoomController {
   constructor(private readonly voiceRoomService: VoiceRoomService) {}
 
+  @Get('rooms/:roomId/state')
+  getRoomState(@Param('roomId') roomId: string) {
+    return this.voiceRoomService.getRoomState(roomId);
+  }
+
   @Get('rooms/:roomId/rtp-capabilities')
   async getRouterRtpCapabilities(@Param('roomId') roomId: string) {
     return this.voiceRoomService.getRouterRtpCapabilities(roomId);
