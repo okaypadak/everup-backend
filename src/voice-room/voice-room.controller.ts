@@ -4,11 +4,25 @@ import { CreateTransportDto } from './dto/create-transport.dto';
 import { ConnectTransportDto } from './dto/connect-transport.dto';
 import { ProduceDto } from './dto/produce.dto';
 import { ConsumeDto } from './dto/consume.dto';
+import { randomUUID } from 'node:crypto';
 
-@Controller('voice-room')
+@Controller('voice')
 export class VoiceRoomController {
   constructor(private readonly voiceRoomService: VoiceRoomService) {}
 
+  // --- NEW ---
+  // Toplantı oluşturma endpoint'i — frontend buradan meetingId alıyor
+  @Post('meetings')
+  createMeeting() {
+    const meetingId = randomUUID(); // benzersiz ID üret
+    return {
+      meetingId,
+      roomId: meetingId,
+      signalingUrl: 'ws://localhost:3000/voice', // frontend'in WebSocket adresi
+    };
+  }
+
+  // --- EXISTING (ODALAR) ---
   @Get('rooms/:roomId/state')
   getRoomState(@Param('roomId') roomId: string) {
     return this.voiceRoomService.getRoomState(roomId);

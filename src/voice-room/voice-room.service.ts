@@ -22,14 +22,15 @@ import {
   IceParameters,
   IceCandidate,
   SctpParameters,
+  MediaKind, WorkerLogTag, WorkerLogLevel,
 } from 'mediasoup/node/lib/types';
-import { createWorker, types as mediasoupTypes } from 'mediasoup';
+import { createWorker } from 'mediasoup';
 import { VoiceRoomStateDto } from './dto/voice-room-state.dto';
 
 interface VoiceRoom {
   id: string;
   router: Router;
-  audioLevelObserver: mediasoupTypes.AudioLevelObserver;
+  audioLevelObserver: any;
   peers: Map<string, VoiceRoomPeer>;
 }
 
@@ -93,9 +94,7 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
       listenIps: [
         {
           ip: this.configService.get<string>('MEDIASOUP_LISTEN_IP', '0.0.0.0'),
-          announcedIp:
-            this.configService.get<string>('MEDIASOUP_ANNOUNCED_IP') ??
-            undefined,
+          announcedIp: this.configService.get<string>('MEDIASOUP_ANNOUNCED_IP') || undefined,
         },
       ],
       enableUdp: true,
@@ -104,25 +103,20 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
       initialAvailableOutgoingBitrate: Number(
         this.configService.get<number>('MEDIASOUP_INITIAL_BITRATE', 600_000),
       ),
-      appData: {
-        peerId,
-        roomId,
-        direction,
-      },
+      appData: { peerId, roomId, direction },
     });
 
     peer.transports.set(transport.id, transport);
 
     transport.on('dtlsstatechange', (state) => {
       if (state === 'closed' || state === 'failed') {
-        this.logger.warn(
-          `DTLS state changed to ${state} for transport ${transport.id}`,
-        );
+        this.logger.warn(`DTLS state changed to ${state} for transport ${transport.id}`);
         transport.close();
         peer.transports.delete(transport.id);
       }
     });
 
+    // @ts-ignore — Mediasoup 3.x runtime event, type tanımında olmayabilir
     transport.on('close', () => {
       peer.transports.delete(transport.id);
     });
@@ -150,7 +144,7 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
     roomId: string,
     peerId: string,
     transportId: string,
-    kind: mediasoupTypes.MediaKind,
+    kind: MediaKind,
     rtpParameters: RtpParameters,
   ): Promise<Producer> {
     const transport = this.getTransport(roomId, peerId, transportId);
@@ -169,6 +163,7 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
       peer.producers.delete(producer.id);
     });
 
+    // @ts-ignore — Mediasoup 3.x event
     producer.on('close', () => {
       peer.producers.delete(producer.id);
     });
@@ -187,19 +182,15 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
     const producer = this.getProducer(roomId, producerId);
 
     if (!room.router.canConsume({ producerId: producer.id, rtpCapabilities })) {
-      throw new BadRequestException(
-        'Client cannot consume the specified producer',
-      );
+      throw new BadRequestException('Client cannot consume the specified producer');
     }
 
     const recvTransport = Array.from(peer.transports.values()).find(
-      (transport) => transport.appData.direction === 'recv',
+      (t) => t.appData.direction === 'recv',
     );
 
     if (!recvTransport) {
-      throw new BadRequestException(
-        'No receiving transport available for peer',
-      );
+      throw new BadRequestException('No receiving transport available for peer');
     }
 
     const consumer = await recvTransport.consume({
@@ -225,26 +216,22 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
 
   getRoomState(roomId: string): VoiceRoomStateDto {
     const room = this.rooms.get(roomId);
-
     if (!room) {
-      return {
-        roomId,
-        peers: [],
-      };
+      return { roomId, peers: [] };
     }
 
     return {
       roomId,
       peers: Array.from(room.peers.entries()).map(([peerId, peer]) => ({
         peerId,
-        producers: Array.from(peer.producers.values()).map((producer) => ({
-          id: producer.id,
-          kind: producer.kind,
+        producers: Array.from(peer.producers.values()).map((p) => ({
+          id: p.id,
+          kind: p.kind,
         })),
-        consumers: Array.from(peer.consumers.values()).map((consumer) => ({
-          id: consumer.id,
-          producerId: consumer.producerId,
-          kind: consumer.kind,
+        consumers: Array.from(peer.consumers.values()).map((c) => ({
+          id: c.id,
+          producerId: c.producerId,
+          kind: c.kind,
         })),
       })),
     };
@@ -252,30 +239,16 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
 
   async closePeer(roomId: string, peerId: string): Promise<void> {
     const room = this.rooms.get(roomId);
-    if (!room) {
-      return;
-    }
+    if (!room) return;
 
     const peer = room.peers.get(peerId);
-    if (!peer) {
-      return;
-    }
+    if (!peer) return;
 
-    for (const consumer of peer.consumers.values()) {
-      consumer.close();
-    }
-    for (const producer of peer.producers.values()) {
-      producer.close();
-    }
-    for (const transport of peer.transports.values()) {
-      transport.close();
-    }
-    for (const dataConsumer of peer.dataConsumers.values()) {
-      dataConsumer.close();
-    }
-    for (const dataProducer of peer.dataProducers.values()) {
-      dataProducer.close();
-    }
+    for (const consumer of peer.consumers.values()) consumer.close();
+    for (const producer of peer.producers.values()) producer.close();
+    for (const transport of peer.transports.values()) transport.close();
+    for (const dc of peer.dataConsumers.values()) dc.close();
+    for (const dp of peer.dataProducers.values()) dp.close();
 
     room.peers.delete(peerId);
 
@@ -287,53 +260,66 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async ensureWorker(): Promise<void> {
-    if (this.worker) {
-      return;
-    }
+  // ---- helpers to parse config into proper mediasoup union types ----
+  private parseWorkerLogLevel(raw?: string): WorkerLogLevel | undefined {
+    if (!raw) return undefined;
+    const lvl = raw.toLowerCase() as WorkerLogLevel;
+    const allowed: WorkerLogLevel[] = ['debug', 'warn', 'error', 'none'];
+    return allowed.includes(lvl) ? lvl : 'warn';
+  }
 
-    const logLevel = this.configService.get<mediasoupTypes.LogLevel>(
-      'MEDIASOUP_LOG_LEVEL',
-      'warn',
-    );
-    const logTags = (
-      this.configService.get<string>('MEDIASOUP_LOG_TAGS', '') || ''
-    )
+  private parseWorkerLogTags(raw?: string): WorkerLogTag[] | undefined {
+    if (!raw) return undefined;
+    const allowed: WorkerLogTag[] = [
+      'info',
+      'ice',
+      'dtls',
+      'rtp',
+      'srtp',
+      'rtcp',
+      'rtx',
+      'bwe',
+      'score',
+      'simulcast',
+      'svc',
+      'sctp',
+      'message',
+    ];
+    const parts = raw
       .split(',')
-      .map((tag) => tag.trim())
-      .filter((tag) => Boolean(tag)) as mediasoupTypes.LogTag[];
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean) as WorkerLogTag[];
+    const filtered = parts.filter((p) => allowed.includes(p));
+    return filtered.length ? filtered : undefined;
+  }
+  // -------------------------------------------------------------------
+
+  private async ensureWorker(): Promise<void> {
+    if (this.worker) return;
+
+    const rawLogLevel = this.configService.get<string>('MEDIASOUP_LOG_LEVEL', 'warn');
+    const rawLogTags = this.configService.get<string>('MEDIASOUP_LOG_TAGS', '');
 
     this.worker = await createWorker({
-      rtcMinPort: Number(
-        this.configService.get<number>('MEDIASOUP_RTC_MIN_PORT', 40000),
-      ),
-      rtcMaxPort: Number(
-        this.configService.get<number>('MEDIASOUP_RTC_MAX_PORT', 49999),
-      ),
-      logLevel,
-      logTags,
+      rtcMinPort: Number(this.configService.get<number>('MEDIASOUP_RTC_MIN_PORT', 40000)),
+      rtcMaxPort: Number(this.configService.get<number>('MEDIASOUP_RTC_MAX_PORT', 49999)),
+      logLevel: this.parseWorkerLogLevel(rawLogLevel),
+      logTags: this.parseWorkerLogTags(rawLogTags),
     });
 
     this.worker.on('died', async () => {
       this.logger.error('Mediasoup worker died, recreating worker');
       this.worker = null;
-      setTimeout(
-        () => this.ensureWorker().catch((error) => this.logger.error(error)),
-        1000,
-      );
+      setTimeout(() => this.ensureWorker().catch((err) => this.logger.error(err)), 1000);
     });
   }
 
   private async getOrCreateRoom(roomId: string): Promise<VoiceRoom> {
     await this.ensureWorker();
-    if (!this.worker) {
-      throw new Error('Mediasoup worker is not available');
-    }
+    if (!this.worker) throw new Error('Mediasoup worker is not available');
 
     let room = this.rooms.get(roomId);
-    if (room) {
-      return room;
-    }
+    if (room) return room;
 
     const router = await this.worker.createRouter({
       mediaCodecs: this.getMediaCodecs(),
@@ -373,42 +359,26 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
 
   private getPeer(roomId: string, peerId: string): VoiceRoomPeer {
     const room = this.rooms.get(roomId);
-    if (!room) {
-      throw new NotFoundException('Room not found');
-    }
-
+    if (!room) throw new NotFoundException('Room not found');
     const peer = room.peers.get(peerId);
-    if (!peer) {
-      throw new NotFoundException('Peer not found in room');
-    }
-
+    if (!peer) throw new NotFoundException('Peer not found in room');
     return peer;
   }
 
-  private getTransport(
-    roomId: string,
-    peerId: string,
-    transportId: string,
-  ): WebRtcTransport {
+  private getTransport(roomId: string, peerId: string, transportId: string): WebRtcTransport {
     const peer = this.getPeer(roomId, peerId);
     const transport = peer.transports.get(transportId);
-    if (!transport) {
-      throw new NotFoundException('Transport not found');
-    }
+    if (!transport) throw new NotFoundException('Transport not found');
     return transport;
   }
 
   private getProducer(roomId: string, producerId: string): Producer {
     const room = this.rooms.get(roomId);
-    if (!room) {
-      throw new NotFoundException('Room not found');
-    }
+    if (!room) throw new NotFoundException('Room not found');
 
     for (const peer of room.peers.values()) {
       const producer = peer.producers.get(producerId);
-      if (producer) {
-        return producer;
-      }
+      if (producer) return producer;
     }
 
     throw new NotFoundException('Producer not found in room');
@@ -420,11 +390,10 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
       mimeType: 'audio/opus',
       clockRate: 48000,
       channels: 2,
-      parameters: {
-        useinbandfec: 1,
-      },
+      parameters: { useinbandfec: 1 },
+      preferredPayloadType: 111, // Opus için yaygın PT
+      // rtcpFeedback: [] // ihtiyaç olursa ekleyin
     };
-
     return [opus];
   }
 }
