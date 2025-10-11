@@ -45,7 +45,7 @@ console.log('--------------------------------');
         ? {
           ssl: {
             rejectUnauthorized: false,
-          },
+              },
         }
         : {},
     }),

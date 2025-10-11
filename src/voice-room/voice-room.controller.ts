@@ -1,107 +1,37 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { VoiceRoomService } from './voice-room.service';
-import { CreateTransportDto } from './dto/create-transport.dto';
-import { ConnectTransportDto } from './dto/connect-transport.dto';
-import { ProduceDto } from './dto/produce.dto';
-import { ConsumeDto } from './dto/consume.dto';
-import { randomUUID } from 'node:crypto';
+import { Controller, Get, Query } from '@nestjs/common';
+import * as crypto from 'crypto';
+
+type IceServer = { urls: string | string[]; username?: string; credential?: string };
 
 @Controller('voice')
 export class VoiceRoomController {
-  constructor(private readonly voiceRoomService: VoiceRoomService) {}
-
-  // --- NEW ---
-  // Toplantı oluşturma endpoint'i — frontend buradan meetingId alıyor
-  @Post('meetings')
-  createMeeting() {
-    const meetingId = randomUUID(); // benzersiz ID üret
-    return {
-      meetingId,
-      roomId: meetingId,
-      signalingUrl: 'ws://localhost:3000/voice', // frontend'in WebSocket adresi
-    };
+  @Get('health')
+  health() {
+    return { ok: true, time: Date.now() };
   }
 
-  // --- EXISTING (ODALAR) ---
-  @Get('rooms/:roomId/state')
-  getRoomState(@Param('roomId') roomId: string) {
-    return this.voiceRoomService.getRoomState(roomId);
-  }
+  @Get('ice')
+  getIce(@Query('uid') uid?: string) {
+    const urls = (process.env.TURN_URLS || '').split(',').map(s => s.trim()).filter(Boolean);
+    const servers: IceServer[] = [];
 
-  @Get('rooms/:roomId/rtp-capabilities')
-  async getRouterRtpCapabilities(@Param('roomId') roomId: string) {
-    return this.voiceRoomService.getRouterRtpCapabilities(roomId);
-  }
+    const stunUrls = urls.filter(u => u.startsWith('stun:'));
+    if (stunUrls.length) servers.push({ urls: stunUrls });
 
-  @Post('rooms/:roomId/transports')
-  async createTransport(
-    @Param('roomId') roomId: string,
-    @Body() dto: CreateTransportDto,
-  ) {
-    const transport = await this.voiceRoomService.createWebRtcTransport(
-      roomId,
-      dto.peerId,
-      dto.direction,
-    );
-    return transport;
-  }
+    const turnUrls = urls.filter(u => u.startsWith('turn:'));
+    if (process.env.TURN_REST_SECRET) {
+      const ttl = Number(process.env.TURN_USERNAME_TTL_SECONDS || 3600);
+      const username = `${Math.floor(Date.now() / 1000) + ttl}:${uid || 'user'}`;
+      const hmac = crypto.createHmac('sha1', process.env.TURN_REST_SECRET).update(username).digest('base64');
+      if (turnUrls.length) servers.push({ urls: turnUrls, username, credential: hmac });
+    } else if (process.env.TURN_STATIC_USERNAME && process.env.TURN_STATIC_PASSWORD) {
+      const username = process.env.TURN_STATIC_USERNAME;
+      const credential = process.env.TURN_STATIC_PASSWORD;
+      if (turnUrls.length) servers.push({ urls: turnUrls, username, credential });
+    } else {
+      if (turnUrls.length) servers.push({ urls: turnUrls }); // credentials yoksa yine döndür
+    }
 
-  @Post('rooms/:roomId/transports/connect')
-  async connectTransport(
-    @Param('roomId') roomId: string,
-    @Body() dto: ConnectTransportDto,
-  ) {
-    await this.voiceRoomService.connectWebRtcTransport(
-      roomId,
-      dto.peerId,
-      dto.transportId,
-      dto.dtlsParameters,
-    );
-    return { status: 'connected' };
-  }
-
-  @Post('rooms/:roomId/producers')
-  async produce(@Param('roomId') roomId: string, @Body() dto: ProduceDto) {
-    const producer = await this.voiceRoomService.produce(
-      roomId,
-      dto.peerId,
-      dto.transportId,
-      dto.kind,
-      dto.rtpParameters,
-    );
-
-    return {
-      id: producer.id,
-      kind: producer.kind,
-    };
-  }
-
-  @Post('rooms/:roomId/consumers')
-  async consume(@Param('roomId') roomId: string, @Body() dto: ConsumeDto) {
-    const consumer = await this.voiceRoomService.consume(
-      roomId,
-      dto.peerId,
-      dto.producerId,
-      dto.rtpCapabilities,
-    );
-
-    return {
-      id: consumer.id,
-      producerId: consumer.producerId,
-      kind: consumer.kind,
-      rtpParameters: consumer.rtpParameters,
-      type: consumer.type,
-      appData: consumer.appData,
-      producerPaused: consumer.producerPaused,
-    };
-  }
-
-  @Delete('rooms/:roomId/peers/:peerId')
-  async closePeer(
-    @Param('roomId') roomId: string,
-    @Param('peerId') peerId: string,
-  ) {
-    await this.voiceRoomService.closePeer(roomId, peerId);
-    return { status: 'left' };
+    return { iceServers: servers };
   }
 }

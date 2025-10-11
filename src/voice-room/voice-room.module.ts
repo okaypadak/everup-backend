@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { VoiceRoomService } from './voice-room.service';
+import { VoiceRoomGateway } from './voice-room.gateway';
 import { VoiceRoomController } from './voice-room.controller';
 
 @Module({
-  imports: [ConfigModule],
+  providers: [VoiceRoomService, VoiceRoomGateway],
   controllers: [VoiceRoomController],
-  providers: [VoiceRoomService],
   exports: [VoiceRoomService],
 })
 export class VoiceRoomModule {}

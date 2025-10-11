@@ -1,399 +1,349 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import {
-  RtpCapabilities,
-  RtpCodecCapability,
-  WebRtcTransport,
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { createWorker, types as mtypes } from 'mediasoup';
+import type {
   Worker,
   Router,
+  RtpCapabilities,
+  WebRtcTransport,
+  WebRtcTransportOptions,
   Producer,
   Consumer,
-  DtlsParameters,
   RtpParameters,
-  DataProducer,
-  DataConsumer,
-  IceParameters,
-  IceCandidate,
-  SctpParameters,
-  MediaKind, WorkerLogTag, WorkerLogLevel,
+  DtlsParameters,
+  MediaKind,
+  AppData,
 } from 'mediasoup/node/lib/types';
-import { createWorker } from 'mediasoup';
-import { VoiceRoomStateDto } from './dto/voice-room-state.dto';
-
-interface VoiceRoom {
-  id: string;
-  router: Router;
-  audioLevelObserver: any;
-  peers: Map<string, VoiceRoomPeer>;
-}
-
-interface VoiceRoomPeer {
-  transports: Map<string, WebRtcTransport>;
-  producers: Map<string, Producer>;
-  consumers: Map<string, Consumer>;
-  dataProducers: Map<string, DataProducer>;
-  dataConsumers: Map<string, DataConsumer>;
-}
-
-export type TransportDirection = 'send' | 'recv';
-
-export interface TransportInfo {
-  id: string;
-  iceParameters: IceParameters;
-  iceCandidates: IceCandidate[];
-  dtlsParameters: DtlsParameters;
-  sctpParameters?: SctpParameters;
-}
+import {
+  VoiceRoom,
+  VoicePeer,
+  Direction,
+  JoinResult,
+} from './types/voice-room.types';
 
 @Injectable()
 export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VoiceRoomService.name);
-  private worker: Worker | null = null;
-  private readonly rooms = new Map<string, VoiceRoom>();
+  private worker!: Worker;
+  private rooms = new Map<string, VoiceRoom>();
 
-  constructor(private readonly configService: ConfigService) {}
+  async onModuleInit() {
+    this.worker = await createWorker({
+      logLevel: 'warn',
+      rtcMinPort: Number(process.env.MEDIASOUP_RTC_MIN_PORT ?? 40000),
+      rtcMaxPort: Number(process.env.MEDIASOUP_RTC_MAX_PORT ?? 49999),
+    });
 
-  async onModuleInit(): Promise<void> {
-    await this.ensureWorker();
+    this.worker.on('died', () => {
+      this.logger.error('mediasoup worker died');
+      process.exit(1);
+    });
+
+    this.logger.log('Mediasoup worker up');
   }
 
-  async onModuleDestroy(): Promise<void> {
+  async onModuleDestroy() {
     for (const room of this.rooms.values()) {
-      room.audioLevelObserver.close();
-      room.router.close();
+      try { room.router.close(); } catch {}
     }
     this.rooms.clear();
-
-    if (this.worker) {
-      this.worker.close();
-      this.worker = null;
-    }
+    try { this.worker?.close(); } catch {}
   }
 
-  async getRouterRtpCapabilities(roomId: string): Promise<RtpCapabilities> {
-    const room = await this.getOrCreateRoom(roomId);
-    return room.router.rtpCapabilities;
-  }
-
-  async createWebRtcTransport(
-    roomId: string,
-    peerId: string,
-    direction: TransportDirection,
-  ): Promise<TransportInfo> {
-    const room = await this.getOrCreateRoom(roomId);
-    const peer = this.getOrCreatePeer(room, peerId);
-
-    const transport = await room.router.createWebRtcTransport({
-      listenIps: [
-        {
-          ip: this.configService.get<string>('MEDIASOUP_LISTEN_IP', '0.0.0.0'),
-          announcedIp: this.configService.get<string>('MEDIASOUP_ANNOUNCED_IP') || undefined,
-        },
+  // ---- Room lifecycle ----
+  private async createRoom(roomId: string): Promise<VoiceRoom> {
+    const router: Router = await this.worker.createRouter({
+      mediaCodecs: [
+        { kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2 },
       ],
+    });
+
+    const audioLevelObserver = await router.createAudioLevelObserver({
+      maxEntries: 3,
+      threshold: -70,
+      interval: 800,
+    });
+
+    const voiceRoom: VoiceRoom = {
+      id: roomId,
+      hostId: undefined,
+      locked: false,
+      router,
+      audioLevelObserver,
+      peers: new Map<string, VoicePeer>(),
+      bannedPeerIds: new Set<string>(),
+    };
+
+    this.rooms.set(roomId, voiceRoom);
+    this.logger.log(`Room created: ${roomId}`);
+    return voiceRoom;
+  }
+
+  private getOrCreateRoom(roomId: string) {
+    return this.rooms.get(roomId) ?? this.createRoom(roomId);
+  }
+
+  getParticipants(roomId: string) {
+    const room = this.rooms.get(roomId);
+    if (!room) return [];
+    return Array.from(room.peers.values()).map(p => ({
+      id: p.id,
+      username: p.username,
+      muted: p.muted,
+      isHost: room.hostId === p.id,
+    }));
+  }
+
+  private webRtcListenIps(): mtypes.TransportListenIp[] {
+    const ip = process.env.MEDIASOUP_LISTEN_IP || '0.0.0.0';
+    const announcedIp = process.env.MEDIASOUP_ANNOUNCED_IP || undefined;
+    return [{ ip, announcedIp }];
+  }
+
+  // ---- Core ops ----
+  async join(roomId: string, username: string, clientId: string): Promise<JoinResult> {
+    const room = await this.getOrCreateRoom(roomId);
+
+    if (room.bannedPeerIds.has(clientId)) {
+      throw new Error('banned');
+    }
+
+    if (room.locked && room.peers.size > 0) {
+      // Kilitliyse, yalnızca mevcut host (veya odada olan) yeniden bağlanabilsin
+      if (room.hostId && room.hostId !== clientId && !room.peers.has(clientId)) {
+        throw new Error('room-locked');
+      }
+    }
+
+    // Reconnect temizliği
+    if (room.peers.has(clientId)) {
+      await this.leave(roomId, clientId);
+    }
+
+    const peer: VoicePeer = {
+      id: clientId,
+      username,
+      muted: false,
+      transports: new Map<string, WebRtcTransport<AppData>>(),
+      producers: new Map<string, Producer<AppData>>(),
+      consumers: new Map<string, Consumer<AppData>>(),
+    };
+
+    room.peers.set(clientId, peer);
+
+    if (!room.hostId) {
+      room.hostId = clientId;
+    }
+
+    // Not: active-speakers publish’ünü gateway üstlenebilir; burada observer zaten kurulu.
+    return {
+      roomId,
+      clientId,
+      isHost: room.hostId === clientId,
+      routerRtpCapabilities: room.router.rtpCapabilities as RtpCapabilities,
+      participants: this.getParticipants(roomId),
+      locked: room.locked,
+    };
+  }
+
+  async leave(roomId: string, clientId: string) {
+    const room = this.rooms.get(roomId);
+    if (!room) return { ok: true };
+
+    const peer = room.peers.get(clientId);
+    if (!peer) return { ok: true };
+
+    // Close mediasoup entities
+    for (const c of peer.consumers.values()) { try { c.close(); } catch {} }
+    for (const p of peer.producers.values()) { try { p.close(); } catch {} }
+    for (const t of peer.transports.values()) { try { t.close(); } catch {} }
+
+    room.peers.delete(clientId);
+
+    // Host devret
+    if (room.hostId === clientId) {
+      const next = Array.from(room.peers.values())[0];
+      room.hostId = next?.id;
+    }
+
+    // Oda boşsa kapat
+    if (room.peers.size === 0) {
+      try { room.audioLevelObserver.close(); } catch {}
+      try { room.router.close(); } catch {}
+      this.rooms.delete(roomId);
+      this.logger.log(`Room closed: ${roomId}`);
+    }
+
+    return { ok: true };
+  }
+
+  async transferHost(roomId: string, byPeerId: string, targetPeerId: string) {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new Error('room-not-found');
+    if (room.hostId !== byPeerId) throw new Error('not-host');
+    if (!room.peers.has(targetPeerId)) throw new Error('peer-not-found');
+
+    room.hostId = targetPeerId;
+    return { ok: true, hostId: room.hostId };
+  }
+
+  async lockRoom(roomId: string, byPeerId: string, locked: boolean) {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new Error('room-not-found');
+    if (room.hostId !== byPeerId) throw new Error('not-host');
+
+    room.locked = locked;
+    return { ok: true, locked };
+  }
+
+  async kickPeer(roomId: string, byPeerId: string, targetPeerId: string, ban = false) {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new Error('room-not-found');
+    if (room.hostId !== byPeerId) throw new Error('not-host');
+    if (!room.peers.has(targetPeerId)) throw new Error('peer-not-found');
+
+    await this.leave(roomId, targetPeerId);
+    if (ban) room.bannedPeerIds.add(targetPeerId);
+    return { ok: true, banned: ban };
+  }
+
+  // ---- WebRTC ops ----
+  async createWebRtcTransport(roomId: string, clientId: string, direction: Direction) {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new Error('room-not-found');
+    const peer = room.peers.get(clientId);
+    if (!peer) throw new Error('peer-not-found');
+
+    const options: WebRtcTransportOptions = {
+      listenIps: this.webRtcListenIps(),
       enableUdp: true,
       enableTcp: true,
       preferUdp: true,
-      initialAvailableOutgoingBitrate: Number(
-        this.configService.get<number>('MEDIASOUP_INITIAL_BITRATE', 600_000),
-      ),
-      appData: { peerId, roomId, direction },
+      initialAvailableOutgoingBitrate: 800_000,
+      appData: { peerId: clientId, direction },
+    };
+
+    const transport = await room.router.createWebRtcTransport(options);
+
+    transport.on('dtlsstatechange', (state) => {
+      if (state === 'closed') transport.close();
+    });
+
+    // Typesafe: 'close' olayını observer üzerinden dinleyelim
+    transport.observer.on('close', () => {
+      this.logger.warn(`transport closed: ${transport.id}`);
     });
 
     peer.transports.set(transport.id, transport);
-
-    transport.on('dtlsstatechange', (state) => {
-      if (state === 'closed' || state === 'failed') {
-        this.logger.warn(`DTLS state changed to ${state} for transport ${transport.id}`);
-        transport.close();
-        peer.transports.delete(transport.id);
-      }
-    });
-
-    // @ts-ignore — Mediasoup 3.x runtime event, type tanımında olmayabilir
-    transport.on('close', () => {
-      peer.transports.delete(transport.id);
-    });
 
     return {
       id: transport.id,
       iceParameters: transport.iceParameters,
       iceCandidates: transport.iceCandidates,
       dtlsParameters: transport.dtlsParameters,
-      sctpParameters: transport.sctpParameters,
     };
   }
 
-  async connectWebRtcTransport(
-    roomId: string,
-    peerId: string,
-    transportId: string,
-    dtlsParameters: DtlsParameters,
-  ): Promise<void> {
-    const transport = this.getTransport(roomId, peerId, transportId);
+  async connectWebRtcTransport(roomId: string, clientId: string, transportId: string, dtlsParameters: DtlsParameters) {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new Error('room-not-found');
+    const peer = room.peers.get(clientId);
+    if (!peer) throw new Error('peer-not-found');
+
+    const transport = peer.transports.get(transportId);
+    if (!transport) throw new Error('transport-not-found');
+
     await transport.connect({ dtlsParameters });
+    return { ok: true };
   }
 
-  async produce(
-    roomId: string,
-    peerId: string,
-    transportId: string,
-    kind: MediaKind,
-    rtpParameters: RtpParameters,
-  ): Promise<Producer> {
-    const transport = this.getTransport(roomId, peerId, transportId);
+  async produce(roomId: string, clientId: string, transportId: string, kind: MediaKind, rtpParameters: RtpParameters) {
+    if (kind !== 'audio') throw new Error('only-audio-supported');
 
-    if (transport.appData.direction !== 'send') {
-      throw new BadRequestException('Transport is not configured for sending');
-    }
+    const room = this.rooms.get(roomId);
+    if (!room) throw new Error('room-not-found');
+    const peer = room.peers.get(clientId);
+    if (!peer) throw new Error('peer-not-found');
 
-    const producer = await transport.produce({ kind, rtpParameters });
+    const transport = peer.transports.get(transportId);
+    if (!transport) throw new Error('transport-not-found');
 
-    const peer = this.getPeer(roomId, peerId);
+    const producer: Producer<AppData> = await transport.produce({
+      kind,
+      rtpParameters,
+      appData: { peerId: clientId },
+    });
+
+    producer.on('transportclose', () => producer.close());
+
     peer.producers.set(producer.id, producer);
 
-    producer.on('transportclose', () => {
-      producer.close();
-      peer.producers.delete(producer.id);
-    });
+    // Aktif konuşmacı için observer’a ekle
+    await room.audioLevelObserver.addProducer({ producerId: producer.id });
 
-    // @ts-ignore — Mediasoup 3.x event
-    producer.on('close', () => {
-      peer.producers.delete(producer.id);
-    });
-
-    return producer;
+    return { producerId: producer.id };
   }
 
-  async consume(
-    roomId: string,
-    peerId: string,
-    producerId: string,
-    rtpCapabilities: RtpCapabilities,
-  ): Promise<Consumer> {
-    const room = await this.getOrCreateRoom(roomId);
-    const peer = this.getPeer(roomId, peerId);
-    const producer = this.getProducer(roomId, producerId);
+  async consume(roomId: string, clientId: string, transportId: string, producerId: string) {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new Error('room-not-found');
+    const peer = room.peers.get(clientId);
+    if (!peer) throw new Error('peer-not-found');
 
-    if (!room.router.canConsume({ producerId: producer.id, rtpCapabilities })) {
-      throw new BadRequestException('Client cannot consume the specified producer');
+    const transport = peer.transports.get(transportId);
+    if (!transport) throw new Error('transport-not-found');
+
+    if (!room.router.canConsume({ producerId, rtpCapabilities: room.router.rtpCapabilities })) {
+      throw new Error('cannot-consume');
     }
 
-    const recvTransport = Array.from(peer.transports.values()).find(
-      (t) => t.appData.direction === 'recv',
-    );
-
-    if (!recvTransport) {
-      throw new BadRequestException('No receiving transport available for peer');
-    }
-
-    const consumer = await recvTransport.consume({
-      producerId: producer.id,
-      rtpCapabilities,
-      paused: producer.kind === 'video',
+    const consumer: Consumer<AppData> = await transport.consume({
+      producerId,
+      rtpCapabilities: room.router.rtpCapabilities,
+      paused: true, // client resume eder
+      appData: { peerId: clientId },
     });
+
+    consumer.on('transportclose', () => consumer.close());
+    consumer.on('producerclose', () => consumer.close());
 
     peer.consumers.set(consumer.id, consumer);
 
-    consumer.on('transportclose', () => {
-      consumer.close();
-      peer.consumers.delete(consumer.id);
-    });
-
-    consumer.on('producerclose', () => {
-      consumer.close();
-      peer.consumers.delete(consumer.id);
-    });
-
-    return consumer;
-  }
-
-  getRoomState(roomId: string): VoiceRoomStateDto {
-    const room = this.rooms.get(roomId);
-    if (!room) {
-      return { roomId, peers: [] };
-    }
-
     return {
-      roomId,
-      peers: Array.from(room.peers.entries()).map(([peerId, peer]) => ({
-        peerId,
-        producers: Array.from(peer.producers.values()).map((p) => ({
-          id: p.id,
-          kind: p.kind,
-        })),
-        consumers: Array.from(peer.consumers.values()).map((c) => ({
-          id: c.id,
-          producerId: c.producerId,
-          kind: c.kind,
-        })),
-      })),
+      consumerId: consumer.id,
+      producerId,
+      kind: consumer.kind,
+      rtpParameters: consumer.rtpParameters,
+      producerPaused: false,
     };
   }
 
-  async closePeer(roomId: string, peerId: string): Promise<void> {
+  async resumeConsumer(roomId: string, clientId: string, consumerId: string) {
     const room = this.rooms.get(roomId);
-    if (!room) return;
+    if (!room) throw new Error('room-not-found');
+    const peer = room.peers.get(clientId);
+    if (!peer) throw new Error('peer-not-found');
 
-    const peer = room.peers.get(peerId);
-    if (!peer) return;
+    const consumer = peer.consumers.get(consumerId);
+    if (!consumer) throw new Error('consumer-not-found');
 
-    for (const consumer of peer.consumers.values()) consumer.close();
-    for (const producer of peer.producers.values()) producer.close();
-    for (const transport of peer.transports.values()) transport.close();
-    for (const dc of peer.dataConsumers.values()) dc.close();
-    for (const dp of peer.dataProducers.values()) dp.close();
-
-    room.peers.delete(peerId);
-
-    if (room.peers.size === 0) {
-      this.logger.log(`Closing empty room ${roomId}`);
-      room.audioLevelObserver.close();
-      room.router.close();
-      this.rooms.delete(roomId);
-    }
+    await consumer.resume();
+    return { ok: true };
   }
 
-  // ---- helpers to parse config into proper mediasoup union types ----
-  private parseWorkerLogLevel(raw?: string): WorkerLogLevel | undefined {
-    if (!raw) return undefined;
-    const lvl = raw.toLowerCase() as WorkerLogLevel;
-    const allowed: WorkerLogLevel[] = ['debug', 'warn', 'error', 'none'];
-    return allowed.includes(lvl) ? lvl : 'warn';
-  }
-
-  private parseWorkerLogTags(raw?: string): WorkerLogTag[] | undefined {
-    if (!raw) return undefined;
-    const allowed: WorkerLogTag[] = [
-      'info',
-      'ice',
-      'dtls',
-      'rtp',
-      'srtp',
-      'rtcp',
-      'rtx',
-      'bwe',
-      'score',
-      'simulcast',
-      'svc',
-      'sctp',
-      'message',
-    ];
-    const parts = raw
-      .split(',')
-      .map((s) => s.trim().toLowerCase())
-      .filter(Boolean) as WorkerLogTag[];
-    const filtered = parts.filter((p) => allowed.includes(p));
-    return filtered.length ? filtered : undefined;
-  }
-  // -------------------------------------------------------------------
-
-  private async ensureWorker(): Promise<void> {
-    if (this.worker) return;
-
-    const rawLogLevel = this.configService.get<string>('MEDIASOUP_LOG_LEVEL', 'warn');
-    const rawLogTags = this.configService.get<string>('MEDIASOUP_LOG_TAGS', '');
-
-    this.worker = await createWorker({
-      rtcMinPort: Number(this.configService.get<number>('MEDIASOUP_RTC_MIN_PORT', 40000)),
-      rtcMaxPort: Number(this.configService.get<number>('MEDIASOUP_RTC_MAX_PORT', 49999)),
-      logLevel: this.parseWorkerLogLevel(rawLogLevel),
-      logTags: this.parseWorkerLogTags(rawLogTags),
-    });
-
-    this.worker.on('died', async () => {
-      this.logger.error('Mediasoup worker died, recreating worker');
-      this.worker = null;
-      setTimeout(() => this.ensureWorker().catch((err) => this.logger.error(err)), 1000);
-    });
-  }
-
-  private async getOrCreateRoom(roomId: string): Promise<VoiceRoom> {
-    await this.ensureWorker();
-    if (!this.worker) throw new Error('Mediasoup worker is not available');
-
-    let room = this.rooms.get(roomId);
-    if (room) return room;
-
-    const router = await this.worker.createRouter({
-      mediaCodecs: this.getMediaCodecs(),
-    });
-
-    const audioLevelObserver = await router.createAudioLevelObserver({
-      maxEntries: 1,
-      threshold: -80,
-      interval: 800,
-    });
-
-    room = {
-      id: roomId,
-      router,
-      audioLevelObserver,
-      peers: new Map(),
-    };
-
-    this.rooms.set(roomId, room);
-    return room;
-  }
-
-  private getOrCreatePeer(room: VoiceRoom, peerId: string): VoiceRoomPeer {
-    let peer = room.peers.get(peerId);
-    if (!peer) {
-      peer = {
-        transports: new Map(),
-        producers: new Map(),
-        consumers: new Map(),
-        dataProducers: new Map(),
-        dataConsumers: new Map(),
-      };
-      room.peers.set(peerId, peer);
-    }
-    return peer;
-  }
-
-  private getPeer(roomId: string, peerId: string): VoiceRoomPeer {
+  async setMute(roomId: string, clientId: string, muted: boolean) {
     const room = this.rooms.get(roomId);
-    if (!room) throw new NotFoundException('Room not found');
-    const peer = room.peers.get(peerId);
-    if (!peer) throw new NotFoundException('Peer not found in room');
-    return peer;
-  }
+    if (!room) throw new Error('room-not-found');
 
-  private getTransport(roomId: string, peerId: string, transportId: string): WebRtcTransport {
-    const peer = this.getPeer(roomId, peerId);
-    const transport = peer.transports.get(transportId);
-    if (!transport) throw new NotFoundException('Transport not found');
-    return transport;
-  }
+    const peer = room.peers.get(clientId);
+    if (!peer) throw new Error('peer-not-found');
 
-  private getProducer(roomId: string, producerId: string): Producer {
-    const room = this.rooms.get(roomId);
-    if (!room) throw new NotFoundException('Room not found');
+    peer.muted = muted;
 
-    for (const peer of room.peers.values()) {
-      const producer = peer.producers.get(producerId);
-      if (producer) return producer;
+    for (const p of peer.producers.values()) {
+      if (muted && !p.paused) await p.pause();
+      if (!muted && p.paused) await p.resume();
     }
 
-    throw new NotFoundException('Producer not found in room');
-  }
-
-  private getMediaCodecs(): RtpCodecCapability[] {
-    const opus: RtpCodecCapability = {
-      kind: 'audio',
-      mimeType: 'audio/opus',
-      clockRate: 48000,
-      channels: 2,
-      parameters: { useinbandfec: 1 },
-      preferredPayloadType: 111, // Opus için yaygın PT
-      // rtcpFeedback: [] // ihtiyaç olursa ekleyin
-    };
-    return [opus];
+    return { ok: true };
   }
 }
