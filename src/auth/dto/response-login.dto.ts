@@ -7,4 +7,10 @@ export class ResponseLoginDto {
 
   @Expose()
   token: string;
+
+  @Expose()
+  expiresIn: number;
+
+  @Expose()
+  expiresAt: string;
 }

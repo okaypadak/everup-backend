@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import * as jwt from 'jsonwebtoken';
+import { extractTokenFromRequest } from './utils/auth-token.util';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -15,18 +16,9 @@ export class RolesGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
 
-    // 1. Authorization header'ını al (case-insensitive)
-    const authHeader =
-      request.headers['authorization'] ||
-      request.headers['Authorization'];
-
-    if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Authorization header eksik veya hatalı');
-    }
-
-    const token = authHeader.split(' ')[1];
+    const token = extractTokenFromRequest(request);
     if (!token) {
-      throw new UnauthorizedException('Token alınamadı');
+      throw new UnauthorizedException('Authorization bilgisi alınamadı');
     }
 
     // 2. JWT doğrula ve kullanıcıyı ekle
