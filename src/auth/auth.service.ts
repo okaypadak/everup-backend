@@ -4,6 +4,7 @@ import * as jwt from 'jsonwebtoken';
 import { UserService } from '../user/user.service';
 import { ResponseLoginDto } from './dto/response-login.dto';
 import { LoginDto } from './dto/login.dto';
+import { getAuthTokenTtlSeconds } from '../common/constants/auth.constants';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +24,7 @@ export class AuthService {
     }
 
     // JWT token oluştur
+    const expiresInSeconds = getAuthTokenTtlSeconds();
     const token = jwt.sign(
       {
         id: user.id,
@@ -31,13 +33,15 @@ export class AuthService {
         lastName: user.lastName
       },
       process.env.JWT_SECRET as string,
-      { expiresIn: '2h' }
+      { expiresIn: expiresInSeconds }
     );
 
     // DTO olarak dön
     return {
       message: 'Giriş başarılı',
       token,
+      expiresIn: expiresInSeconds,
+      expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
     };
   }
 }

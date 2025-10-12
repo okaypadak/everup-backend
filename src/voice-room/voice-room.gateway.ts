@@ -8,6 +8,7 @@ import { Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { JwtUser } from './types/voice-room.types';
+import { extractTokenFromRequest } from '../auth/utils/auth-token.util';
 
 type AnyJson = Record<string, any>;
 
@@ -31,7 +32,7 @@ export class VoiceRoomGateway implements OnGatewayInit, OnGatewayConnection, OnG
     this.logger.log('VoiceRoomGateway initialized');
   }
 
-  // JWT doğrulama (connection upgrade isteğinden Authorization header)
+  // JWT doğrulama (connection upgrade isteğinde header veya cookie)
   handleConnection(client: WebSocket, req: any) {
     const clientId = randomUUID();
     const meta = {
@@ -41,12 +42,10 @@ export class VoiceRoomGateway implements OnGatewayInit, OnGatewayConnection, OnG
     } as any;
 
     try {
-      const authHeader =
-        req.headers['authorization'] || req.headers['Authorization'];
-      if (!authHeader || typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      const token = extractTokenFromRequest(req);
+      if (!token) {
         throw new Error('no-auth');
       }
-      const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtUser;
       meta.user = decoded;
       meta.username = decoded.name || decoded.email || `user-${clientId.slice(0, 6)}`;
