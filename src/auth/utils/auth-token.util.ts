@@ -1,5 +1,5 @@
 import type { Request } from 'express';
-import { AUTH_COOKIE_NAME } from '../../common/constants/auth.constants';
+import { AUTH_COOKIE_NAME } from '../auth.constants';
 
 type HeadersLike = Record<string, unknown> | undefined;
 

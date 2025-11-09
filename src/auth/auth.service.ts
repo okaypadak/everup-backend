@@ -4,7 +4,7 @@ import * as jwt from 'jsonwebtoken';
 import { UserService } from '../user/user.service';
 import { ResponseLoginDto } from './dto/response-login.dto';
 import { LoginDto } from './dto/login.dto';
-import { getAuthTokenTtlSeconds } from '../common/constants/auth.constants';
+import { getAuthTokenTtlSeconds } from './auth.constants';
 
 @Injectable()
 export class AuthService {

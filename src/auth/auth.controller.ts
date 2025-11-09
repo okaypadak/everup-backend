@@ -4,11 +4,9 @@ import { UserService } from '../user/user.service';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import type { Request, Response } from 'express';
-import {
-  AUTH_COOKIE_NAME,
-  buildAuthCookieOptions,
-} from '../common/constants/auth.constants';
 import * as jwt from 'jsonwebtoken';
+import { AUTH_COOKIE_NAME, buildAuthCookieOptions } from './auth.constants';
+import { extractTokenFromRequest } from './utils/auth-token.util';
 
 @Controller('auth')
 export class AuthController {
@@ -52,13 +50,10 @@ export class AuthController {
     return { message: 'Kayıt başarılı' };
   }
 
-  // ✅ Kullanıcı bilgilerini döndürür (cookie’den token'ı okuyarak)
   @Get('me')
   async me(@Req() req: Request) {
-    const token = req.cookies?.[AUTH_COOKIE_NAME];
-    if (!token) {
-      return { user: null };
-    }
+    const token = extractTokenFromRequest(req as any);
+    if (!token) return { user: null };
 
     try {
       const decoded: any = jwt.verify(token, process.env.JWT_SECRET as string);
@@ -69,8 +64,7 @@ export class AuthController {
           role: decoded.role,
         },
       };
-    } catch (err) {
-      console.error('JWT doğrulama hatası:', err);
+    } catch {
       return { user: null };
     }
   }
