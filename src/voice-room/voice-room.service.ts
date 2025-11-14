@@ -123,6 +123,7 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
       id: clientId,
       username,
       muted: false,
+      rtpCapabilities: undefined,
       transports: new Map<string, WebRtcTransport<AppData>>(),
       producers: new Map<string, Producer<AppData>>(),
       consumers: new Map<string, Consumer<AppData>>(),
@@ -154,7 +155,10 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
 
     // Close mediasoup entities
     for (const c of peer.consumers.values()) { try { c.close(); } catch {} }
-    for (const p of peer.producers.values()) { try { p.close(); } catch {} }
+    for (const p of peer.producers.values()) {
+      try { room.audioLevelObserver.removeProducer({ producerId: p.id }); } catch {}
+      try { p.close(); } catch {}
+    }
     for (const t of peer.transports.values()) { try { t.close(); } catch {} }
 
     room.peers.delete(clientId);
@@ -274,6 +278,9 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
     });
 
     producer.on('transportclose', () => producer.close());
+    producer.observer.on('close', () => {
+      try { room.audioLevelObserver.removeProducer({ producerId: producer.id }); } catch {}
+    });
 
     peer.producers.set(producer.id, producer);
 
@@ -283,7 +290,7 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
     return { producerId: producer.id };
   }
 
-  async consume(roomId: string, clientId: string, transportId: string, producerId: string) {
+  async consume(roomId: string, clientId: string, transportId: string, producerId: string, rtpCapabilities?: RtpCapabilities) {
     const room = this.rooms.get(roomId);
     if (!room) throw new Error('room-not-found');
     const peer = room.peers.get(clientId);
@@ -292,13 +299,17 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
     const transport = peer.transports.get(transportId);
     if (!transport) throw new Error('transport-not-found');
 
-    if (!room.router.canConsume({ producerId, rtpCapabilities: room.router.rtpCapabilities })) {
+    const peerCapabilities = rtpCapabilities ?? peer.rtpCapabilities;
+    if (!peerCapabilities) throw new Error('missing-rtp-capabilities');
+    peer.rtpCapabilities = peerCapabilities;
+
+    if (!room.router.canConsume({ producerId, rtpCapabilities: peerCapabilities })) {
       throw new Error('cannot-consume');
     }
 
     const consumer: Consumer<AppData> = await transport.consume({
       producerId,
-      rtpCapabilities: room.router.rtpCapabilities,
+      rtpCapabilities: peerCapabilities,
       paused: true, // client resume eder
       appData: { peerId: clientId },
     });

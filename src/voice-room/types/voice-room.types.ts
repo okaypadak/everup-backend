@@ -23,6 +23,7 @@ export interface VoicePeer {
   id: string;
   username: string;
   muted: boolean;
+  rtpCapabilities?: RtpCapabilities;
   // Burada AppData kullanıyoruz (generic uyuşmazlığı yaşamamak için)
   transports: Map<string, WebRtcTransport<AppData>>;
   producers: Map<string, Producer<AppData>>;

@@ -149,8 +149,8 @@ export class VoiceRoomGateway implements OnGatewayInit, OnGatewayConnection, OnG
         }
 
         case 'consume': {
-          const { roomId, transportId, producerId } = data as any;
-          const payload = await this.voice.consume(roomId, meta.clientId, transportId, producerId);
+          const { roomId, transportId, producerId, rtpCapabilities } = data as any;
+          const payload = await this.voice.consume(roomId, meta.clientId, transportId, producerId, rtpCapabilities);
           this.send(client, { type: 'consumed', data: payload });
           return;
         }
