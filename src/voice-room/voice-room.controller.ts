@@ -1,5 +1,8 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
+import type { Request } from 'express';
+import * as jwt from 'jsonwebtoken';
+import { extractTokenFromRequest } from '../auth/utils/auth-token.util';
 
 type IceServer = { urls: string | string[]; username?: string; credential?: string };
 
@@ -33,5 +36,34 @@ export class VoiceRoomController {
     }
 
     return { iceServers: servers };
+  }
+
+  @Post('ws-token')
+  async issueWsToken(@Req() req: Request) {
+    const sessionToken = extractTokenFromRequest(req as any);
+    if (!sessionToken) {
+      throw new UnauthorizedException('Authentication token is missing');
+    }
+
+    let payload: Record<string, any>;
+    try {
+      payload = jwt.verify(sessionToken, process.env.JWT_SECRET as string) as Record<string, any>;
+    } catch {
+      throw new UnauthorizedException('Invalid authentication token');
+    }
+
+    const { iat, exp, ...claims } = payload;
+    const ttlSeconds = Number(process.env.VOICE_WS_TOKEN_TTL_SECONDS ?? 300);
+
+    const voiceToken = jwt.sign(
+      {
+        ...claims,
+        voice: true,
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: ttlSeconds },
+    );
+
+    return { token: voiceToken, expiresIn: ttlSeconds };
   }
 }

@@ -42,7 +42,10 @@ export class VoiceRoomGateway implements OnGatewayInit, OnGatewayConnection, OnG
     } as any;
 
     try {
-      const token = extractTokenFromRequest(req);
+      const baseUrl = `http://${req.headers?.host || 'localhost'}`;
+      const url = new URL(req.url || '/', baseUrl);
+      const tokenFromQuery = url.searchParams.get('token');
+      const token = tokenFromQuery || extractTokenFromRequest(req);
       if (!token) {
         throw new Error('no-auth');
       }
