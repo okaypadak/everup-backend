@@ -156,7 +156,9 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
     // Close mediasoup entities
     for (const c of peer.consumers.values()) { try { c.close(); } catch {} }
     for (const p of peer.producers.values()) {
-      try { room.audioLevelObserver.removeProducer({ producerId: p.id }); } catch {}
+      try {
+        await room.audioLevelObserver.removeProducer({ producerId: p.id });
+      } catch {}
       try { p.close(); } catch {}
     }
     for (const t of peer.transports.values()) { try { t.close(); } catch {} }
@@ -278,8 +280,10 @@ export class VoiceRoomService implements OnModuleInit, OnModuleDestroy {
     });
 
     producer.on('transportclose', () => producer.close());
-    producer.observer.on('close', () => {
-      try { room.audioLevelObserver.removeProducer({ producerId: producer.id }); } catch {}
+    producer.observer.on('close', async () => {
+      try {
+        await room.audioLevelObserver.removeProducer({ producerId: producer.id });
+      } catch {}
     });
 
     peer.producers.set(producer.id, producer);
